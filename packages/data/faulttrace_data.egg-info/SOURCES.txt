@@ -1,0 +1,10 @@
+pyproject.toml
+faulttrace_data/__init__.py
+faulttrace_data/cli.py
+faulttrace_data/generator.py
+faulttrace_data.egg-info/PKG-INFO
+faulttrace_data.egg-info/SOURCES.txt
+faulttrace_data.egg-info/dependency_links.txt
+faulttrace_data.egg-info/entry_points.txt
+faulttrace_data.egg-info/requires.txt
+faulttrace_data.egg-info/top_level.txt

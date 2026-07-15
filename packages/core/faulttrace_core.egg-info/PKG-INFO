@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: faulttrace-core
+Version: 0.1.0
+Summary: Core domain contracts for FaultTrace-RAG
+Requires-Python: >=3.11
+Requires-Dist: pydantic>=2.7.0
+Requires-Dist: orjson>=3.10.0

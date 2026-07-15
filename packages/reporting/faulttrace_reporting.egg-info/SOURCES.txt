@@ -1,0 +1,7 @@
+pyproject.toml
+faulttrace_reporting/__init__.py
+faulttrace_reporting.egg-info/PKG-INFO
+faulttrace_reporting.egg-info/SOURCES.txt
+faulttrace_reporting.egg-info/dependency_links.txt
+faulttrace_reporting.egg-info/requires.txt
+faulttrace_reporting.egg-info/top_level.txt

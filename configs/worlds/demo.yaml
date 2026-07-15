@@ -1,0 +1,37 @@
+schema_version: "2.0.0"
+
+groups:
+  - group_id: "demo-seed-42"
+    dataset_id: "track_m"
+    seed: 42
+    description: "Default demo nested worlds for seed 42"
+    include_adversarial: true
+    holdout_fraction: 0.0
+    scales:
+      - n: 10
+        policy: deterministic_prefix
+      - n: 50
+        policy: deterministic_prefix
+      - n: 200
+        policy: deterministic_prefix
+        adversarial_slices: []
+      - n: 1000
+        policy: deterministic_prefix
+        adversarial_slices:
+          - null_heavy
+          - tie_heavy
+          - rare_category
+          - date_boundary
+          - near_equal
+
+  - group_id: "demo-seed-42-stratified"
+    dataset_id: "track_m"
+    seed: 42
+    description: "Stratified sampling variant for seed 42"
+    include_adversarial: false
+    holdout_fraction: 0.0
+    scales:
+      - n: 200
+        policy: stratified
+      - n: 1000
+        policy: stratified

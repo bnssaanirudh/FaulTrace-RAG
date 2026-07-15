@@ -1,0 +1,56 @@
+version: "3.9"
+
+# ─── FaultTrace-RAG Docker Compose ───────────────────────────────────────────
+# One-command demo:
+#   docker compose up
+#
+# Services:
+#   api  — FastAPI backend        → http://localhost:8000
+#   web  — Next.js dashboard      → http://localhost:3000
+#
+# Note: No GPU or external APIs required. All data is generated deterministically.
+# ─────────────────────────────────────────────────────────────────────────────
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: faulttrace-api
+    ports:
+      - "8000:8000"
+    environment:
+      - FAULTTRACE_DATA_ROOT=/app/data
+      - FAULTTRACE_ARTIFACTS_ROOT=/app/artifacts
+      - FAULTTRACE_DB_PATH=/app/data/faulttrace.db
+      - FAULTTRACE_CORS_ORIGINS=http://localhost:3000
+      - FAULTTRACE_LOG_LEVEL=INFO
+    volumes:
+      - faulttrace_data:/app/data
+      - faulttrace_artifacts:/app/artifacts
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  web:
+    build:
+      context: apps/web
+      dockerfile: ../../docker/web.Dockerfile
+    container_name: faulttrace-web
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  faulttrace_data:
+    name: faulttrace_data
+  faulttrace_artifacts:
+    name: faulttrace_artifacts

@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: faulttrace-gold
+Version: 0.1.0
+Summary: Dual gold engine (Pandas + DuckDB) for FaultTrace-RAG
+Requires-Python: >=3.11
+Requires-Dist: faulttrace-core
+Requires-Dist: pandas>=2.2.0
+Requires-Dist: duckdb>=1.0.0
+Requires-Dist: pyarrow>=16.0.0
+Requires-Dist: orjson>=3.10.0

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "faulttrace-api"
+version = "0.1.0"
+description = "FastAPI service for FaultTrace-RAG"
+requires-python = ">=3.11"
+dependencies = [
+    "faulttrace-core",
+    "faulttrace-data",
+    "faulttrace-gold",
+    "faulttrace-pipelines",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "sqlalchemy>=2.0.30",
+    "alembic>=1.13.0",
+    "orjson>=3.10.0",
+    "structlog>=24.1.0",
+    "python-multipart>=0.0.9",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["faulttrace_api*"]

@@ -1,0 +1,2 @@
+[console_scripts]
+faulttrace = faulttrace_data.cli:app

@@ -1,0 +1,4 @@
+faulttrace-core
+faulttrace-gold
+pandas>=2.2.0
+orjson>=3.10.0

@@ -1,0 +1,5 @@
+faulttrace-core
+pandas>=2.2.0
+pyarrow>=16.0.0
+orjson>=3.10.0
+typer>=0.12.0

@@ -1,0 +1,2 @@
+pydantic>=2.7.0
+orjson>=3.10.0

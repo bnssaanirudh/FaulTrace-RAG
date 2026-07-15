@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "faulttrace-pipelines"
+version = "0.1.0"
+description = "Pipeline implementations for FaultTrace-RAG"
+requires-python = ">=3.11"
+dependencies = [
+    "faulttrace-core",
+    "faulttrace-gold",
+    "pandas>=2.2.0",
+    "orjson>=3.10.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["faulttrace_pipelines*"]

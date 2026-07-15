@@ -1,0 +1,9 @@
+{
+  "/_not-found/page": "/_not-found",
+  "/page": "/",
+  "/runs/page": "/runs",
+  "/worlds/page": "/worlds",
+  "/settings/page": "/settings",
+  "/queries/page": "/queries",
+  "/(dashboard)/page": "/"
+}

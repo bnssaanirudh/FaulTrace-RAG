@@ -1,0 +1,7 @@
+Metadata-Version: 2.4
+Name: faulttrace-reporting
+Version: 0.1.0
+Summary: Reporting utilities for FaultTrace-RAG
+Requires-Python: >=3.11
+Requires-Dist: faulttrace-core
+Requires-Dist: orjson>=3.10.0
