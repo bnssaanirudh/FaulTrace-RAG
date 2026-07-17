@@ -1,0 +1,17 @@
+{
+  "batch_id": "springer_39b2316a31a15dc1c7fcf7d907a6fd8a1aa186218f360d03f9fcc3f712509c39",
+  "total_runs": 4844,
+  "successful_lattices": 4844,
+  "failed_lattices": 0,
+  "mean_error": 0.49568855142272045,
+  "dominant_fault_counts": {
+    "scope": 3533,
+    "none": 1311
+  },
+  "mean_phi_scope": 0.2458966791903023,
+  "mean_phi_facts": 0.2458966791903023,
+  "mean_phi_aggregation": 0.0016515276630883566,
+  "parquet_export": "outputs\\parquet\\springer_39b2316a31a15dc1c7fcf7d907a6fd8a1aa186218f360d03f9fcc3f712509c39.parquet",
+  "csv_export": "outputs\\parquet\\springer_39b2316a31a15dc1c7fcf7d907a6fd8a1aa186218f360d03f9fcc3f712509c39.csv",
+  "timestamp": "2026-07-17T12:22:50.613412+00:00"
+}
