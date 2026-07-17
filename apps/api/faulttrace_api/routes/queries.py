@@ -16,7 +16,7 @@ from faulttrace_api.models import GenerateQueriesRequest, PaginatedResponse, Que
 router = APIRouter()
 
 
-@router.get("/queries", response_model=PaginatedResponse, summary="List queries with filters")
+@router.get("/queries", response_model=PaginatedResponse[QueryResponse], summary="List queries with filters")
 async def list_queries(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=200),

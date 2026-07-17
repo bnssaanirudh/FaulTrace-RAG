@@ -77,7 +77,7 @@ class DuckDBEvaluator:
         
         # Step 1: Count eligible records
         eligible_sql = f"SELECT COUNT(*) FROM records WHERE {scope_sql}"
-        eligible_count = int(con.execute(eligible_sql).fetchone()[0])
+        eligible_count = int(con.execute(eligible_sql).fetchone()[0])  # type: ignore[index]
         
         # Step 2: Execute aggregation
         agg_spec = query.aggregation_spec
@@ -124,7 +124,7 @@ class DuckDBEvaluator:
             sql = f"SELECT COUNT(DISTINCT {field}) FROM records WHERE {scope_sql}"
         else:
             sql = f"SELECT COUNT(*) FROM records WHERE {scope_sql}"
-        result = int(con.execute(sql).fetchone()[0])
+        result = int(con.execute(sql).fetchone()[0])  # type: ignore[index]
         ids_sql = f"SELECT record_id FROM records WHERE {scope_sql}"
         ids = [row[0] for row in con.execute(ids_sql).fetchall()]
         return result, ids, {"distinct": spec.distinct}, sql
@@ -136,7 +136,7 @@ class DuckDBEvaluator:
             sql = f"SELECT SUM({field}) FROM records WHERE {scope_sql} AND {field} IS NOT NULL"
         else:
             sql = f"SELECT SUM(COALESCE({field}, 0)) FROM records WHERE {scope_sql}"
-        val = con.execute(sql).fetchone()[0]
+        val = con.execute(sql).fetchone()[0]  # type: ignore[index]
         result = float(val) if val is not None else 0.0
         ids_sql = f"SELECT record_id FROM records WHERE {scope_sql}"
         ids = [row[0] for row in con.execute(ids_sql).fetchall()]
@@ -152,7 +152,7 @@ class DuckDBEvaluator:
             sql = f"SELECT ROUND(AVG({field}), {spec.decimal_places}), COUNT({field}) FROM records WHERE {scope_sql}"
         
         row = con.execute(sql).fetchone()
-        val, n = row[0], row[1]
+        val, n = row[0], row[1]  # type: ignore[index]
         result = float(val) if val is not None else None
         ids_sql = f"SELECT record_id FROM records WHERE {scope_sql}"
         ids = [row[0] for row in con.execute(ids_sql).fetchall()]
@@ -162,10 +162,10 @@ class DuckDBEvaluator:
         num_sql = compiler.to_duckdb_sql(spec.numerator_predicate)
         
         denom_sql = f"SELECT COUNT(*) FROM records WHERE {scope_sql}"
-        denominator = int(con.execute(denom_sql).fetchone()[0])
+        denominator = int(con.execute(denom_sql).fetchone()[0])  # type: ignore[index]
         
         numer_sql = f"SELECT COUNT(*) FROM records WHERE ({scope_sql}) AND ({num_sql})"
-        numerator = int(con.execute(numer_sql).fetchone()[0])
+        numerator = int(con.execute(numer_sql).fetchone()[0])  # type: ignore[index]
         
         if denominator == 0:
             return None, [], {"note": "empty_denominator"}, denom_sql
@@ -190,6 +190,7 @@ class DuckDBEvaluator:
         diff = round(val_a - val_b, 6)
         ratio = round(val_a / val_b, 6) if val_b != 0 else None
         
+        result: Any
         if spec.output == "difference":
             result = diff
         elif spec.output == "ratio":
@@ -208,17 +209,17 @@ class DuckDBEvaluator:
     def _group_sql_measure(self, spec: ComparisonSpec, where_clause: str, con: duckdb.DuckDBPyConnection) -> Optional[float]:
         if spec.measure == "count":
             sql = f"SELECT COUNT(*) FROM records WHERE {where_clause}"
-            val = con.execute(sql).fetchone()[0]
+            val = con.execute(sql).fetchone()[0]  # type: ignore[index]
             return float(val)
         elif spec.measure == "mean" and spec.field:
             field = _validate_field_name(spec.field)
             sql = f"SELECT AVG({field}) FROM records WHERE {where_clause} AND {field} IS NOT NULL"
-            val = con.execute(sql).fetchone()[0]
+            val = con.execute(sql).fetchone()[0]  # type: ignore[index]
             return float(val) if val is not None else None
         elif spec.measure == "sum" and spec.field:
             field = _validate_field_name(spec.field)
             sql = f"SELECT SUM({field}) FROM records WHERE {where_clause}"
-            val = con.execute(sql).fetchone()[0]
+            val = con.execute(sql).fetchone()[0]  # type: ignore[index]
             return float(val) if val is not None else 0.0
         return None
 

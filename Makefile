@@ -103,6 +103,17 @@ lint:  ## Run ruff linter
 typecheck:  ## Run mypy type check
 	$(PYTHON) -m mypy packages/core/faulttrace_core/ packages/gold/faulttrace_gold/ --ignore-missing-imports
 
+.PHONY: release-check
+release-check: lint typecheck test test-smoke ## Run all quality gates for release
+	@Write-Host "Running frontend quality gates..." -ForegroundColor Cyan
+	cd apps\web; npm run type-check; npm run lint
+
+.PHONY: release
+release: release-check ## Package the codebase into a zip artifact
+	@Write-Host "Creating release artifact..." -ForegroundColor Cyan
+	powershell -Command "Compress-Archive -Path * -DestinationPath faulttrace-release.zip -Force"
+	@Write-Host "Release created at faulttrace-release.zip" -ForegroundColor Green
+
 ##############################################################################
 # Cleanup
 ##############################################################################

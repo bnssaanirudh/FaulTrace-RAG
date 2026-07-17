@@ -145,7 +145,7 @@ async def create_map_plan(
     return plan.model_dump()
 
 
-@router.get("/runs", response_model=PaginatedResponse, summary="List pipeline runs")
+@router.get("/runs", response_model=PaginatedResponse[RunResponse], summary="List pipeline runs")
 async def list_runs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),

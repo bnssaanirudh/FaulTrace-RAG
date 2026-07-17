@@ -25,13 +25,20 @@ def _get_registry():
 async def list_datasets(
     dataset_id: Optional[str] = Query(None, description="Filter by dataset ID"),
     active_only: bool = Query(True, description="Only return active snapshots"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
 ) -> dict[str, Any]:
     try:
         registry = _get_registry()
         snapshots = registry.list_snapshots(dataset_id=dataset_id, active_only=active_only)
+        
+        total = len(snapshots)
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_snapshots = snapshots[start:end]
+        
         return {
-            "count": len(snapshots),
-            "snapshots": [
+            "items": [
                 {
                     "snapshot_id": s.snapshot_id,
                     "dataset_id": s.dataset_id,
@@ -46,8 +53,13 @@ async def list_datasets(
                     "license_note": s.license_note,
                     "canonical_content_hash": s.canonical_content_hash[:16] if s.canonical_content_hash else "",
                 }
-                for s in snapshots
+                for s in page_snapshots
             ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "has_next": end < total,
+            "count": len(page_snapshots), # For backwards compatibility
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

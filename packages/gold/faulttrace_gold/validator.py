@@ -89,7 +89,7 @@ class GoldValidator:
             pd_value = None
             pd_ids = []
             pd_eligible = 0
-            pd_error = str(e)
+            pd_error: Optional[str] = str(e)
         else:
             pd_error = None
 
@@ -106,7 +106,7 @@ class GoldValidator:
             dk_value = None
             dk_ids = []
             dk_eligible = 0
-            dk_error = str(e)
+            dk_error: Optional[str] = str(e)
         else:
             dk_error = None
 

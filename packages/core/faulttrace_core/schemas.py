@@ -43,7 +43,7 @@ def export_all_schemas(output_dir: Path) -> dict[str, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
     written: dict[str, Path] = {}
     for name, model_class in EXPORTABLE_MODELS.items():
-        schema = model_class.model_json_schema()
+        schema = model_class.model_json_schema()  # type: ignore[attr-defined]
         schema["$schema"] = "https://json-schema.org/draft/2020-12/schema"
         schema["x-schema-version"] = SCHEMA_VERSION
         out_path = output_dir / f"{name}.schema.json"
@@ -56,4 +56,4 @@ def get_schema(model_name: str) -> dict[str, Any]:
     """Get JSON schema dict for a named model."""
     if model_name not in EXPORTABLE_MODELS:
         raise ValueError(f"Unknown model: {model_name}. Available: {list(EXPORTABLE_MODELS)}")
-    return EXPORTABLE_MODELS[model_name].model_json_schema()
+    return EXPORTABLE_MODELS[model_name].model_json_schema()  # type: ignore[attr-defined]

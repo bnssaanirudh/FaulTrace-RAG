@@ -17,10 +17,23 @@ from faulttrace_api.models import PaginatedResponse, RecordResponse, WorldRespon
 router = APIRouter()
 
 
-@router.get("/worlds", response_model=list[WorldResponse], summary="List all corpus worlds")
-async def list_worlds(db: Session = Depends(get_db)):
-    rows = db.query(WorldRow).order_by(WorldRow.scale_n).all()
-    return [_world_row_to_response(r) for r in rows]
+@router.get("/worlds", response_model=PaginatedResponse[WorldResponse], summary="List all corpus worlds")
+async def list_worlds(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
+    db: Session = Depends(get_db)
+):
+    total = db.query(WorldRow).count()
+    start = (page - 1) * page_size
+    rows = db.query(WorldRow).order_by(WorldRow.scale_n).offset(start).limit(page_size).all()
+    
+    return PaginatedResponse(
+        items=[_world_row_to_response(r) for r in rows],
+        total=total,
+        page=page,
+        page_size=page_size,
+        has_next=(start + page_size) < total,
+    )
 
 
 @router.get("/worlds/{world_id}", response_model=WorldResponse, summary="Get world details")

@@ -1,0 +1,10 @@
+\documentclass{article}
+\usepackage{amsmath}
+
+\begin{document}
+\section{Oracle Shapley Formulations}
+The marginal contribution of component $i$ is calculated as:
+\begin{equation}
+\phi_i(v) = \sum_{S \subseteq N \setminus \{i\}} \frac{|S|! (n - |S| - 1)!}{n!} (v(S \cup \{i\}) - v(S))
+\end{equation}
+\end{document}

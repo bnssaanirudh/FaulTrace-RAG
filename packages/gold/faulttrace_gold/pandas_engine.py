@@ -211,6 +211,7 @@ class PandasEvaluator:
         diff = round(val_a - val_b, 6)
         ratio = round(val_a / val_b, 6) if val_b != 0 else None
         
+        result: Any
         if spec.output == "difference":
             result = diff
         elif spec.output == "ratio":

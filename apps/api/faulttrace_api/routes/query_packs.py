@@ -17,13 +17,15 @@ router = APIRouter()
 @router.get("/query-packs", summary="List available query benchmark packs")
 async def list_packs(
     world_id: Optional[str] = Query(None, description="Filter by world ID"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(50, ge=1, le=500),
 ) -> dict[str, Any]:
     """List all benchmark pack JSON files in the artifacts/query_packs directory."""
     settings = get_settings()
     packs_dir = settings.data_root.parent / "artifacts" / "query_packs"
 
     if not packs_dir.exists():
-        return {"count": 0, "packs": []}
+        return {"items": [], "total": 0, "page": page, "page_size": page_size, "has_next": False, "count": 0}
 
     import json
     packs = []
@@ -48,7 +50,19 @@ async def list_packs(
         except Exception:
             pass
 
-    return {"count": len(packs), "packs": packs}
+    total = len(packs)
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_packs = packs[start:end]
+
+    return {
+        "items": page_packs,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "has_next": end < total,
+        "count": len(page_packs) # Backwards compatibility
+    }
 
 
 @router.get("/query-packs/{world_id}", summary="Get a benchmark pack for a world")

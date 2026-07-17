@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -26,10 +27,19 @@ async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db))
         artifact_info = {}
         for name, path_str in refs.items():
             p = Path(path_str)
+            sha256 = None
+            if p.exists():
+                hasher = hashlib.sha256()
+                with open(p, "rb") as f:
+                    for chunk in iter(lambda: f.read(4096), b""):
+                        hasher.update(chunk)
+                sha256 = hasher.hexdigest()
+            
             artifact_info[name] = {
                 "path": path_str,
                 "exists": p.exists(),
                 "size_bytes": p.stat().st_size if p.exists() else None,
+                "sha256": sha256,
             }
         return {
             "artifact_id": artifact_id,

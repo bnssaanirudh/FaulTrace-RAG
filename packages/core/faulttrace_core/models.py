@@ -569,19 +569,19 @@ class GoldAnswer(BaseModel):
 
     # Prompt 2 additions (all optional, backward-compatible)
     eligibility_trace: Optional[dict[str, Any]] = Field(
-        None,
+        default=None,
         description="Trace of eligibility filtering for denominator computation"
     )
     denominator_trace: Optional[dict[str, Any]] = Field(
-        None,
+        default=None,
         description="Explicit denominator predicate and count for proportion/ranking queries"
     )
     tie_resolution_record: Optional[dict[str, Any]] = Field(
-        None,
+        default=None,
         description="Tie-resolution details for top-k and comparison queries"
     )
     disagreement_diagnostic: Optional[dict[str, Any]] = Field(
-        None,
+        default=None,
         description="Intermediate table hashes and engine states when Pandas/DuckDB disagree"
     )
 

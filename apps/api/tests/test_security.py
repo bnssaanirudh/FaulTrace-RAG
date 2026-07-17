@@ -19,4 +19,4 @@ def test_path_traversal_blocked():
     }
     response = client.post("/api/v1/datasets/ingest", json=payload)
     assert response.status_code == 400
-    assert "Path traversal" in response.json()["detail"] or "Invalid path" in response.json()["detail"]
+    assert "Path traversal" in response.json()["message"] or "Invalid path" in response.json()["message"]

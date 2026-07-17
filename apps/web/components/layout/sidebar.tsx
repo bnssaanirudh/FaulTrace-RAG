@@ -48,6 +48,7 @@ const navSections = [
     items: [
       { href: '/experiments', label: 'Experiments',     icon: BarChart3 },
       { href: '/reports',     label: 'Reports & Exports', icon: FileDown },
+      { href: '/demo-gallery',label: 'Demo Gallery',    icon: Globe },
     ],
   },
   {
