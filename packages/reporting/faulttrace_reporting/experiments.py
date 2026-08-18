@@ -4,24 +4,27 @@ Experiment specification, validation, matrix expansion, and resumable matrix run
 
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
 import logging
-import time
+import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
-import uuid
+from typing import Any
+
 import pandas as pd
-
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy.orm import Session
-
-from faulttrace_core.models import GoldAnswer, QuerySpec, PipelineRun, CoverageDecision
-from faulttrace_api.database import RunRow, TraceEventRow, ExperimentRow, get_session_factory, init_db
 from faulttrace_api.config import get_settings
-from faulttrace_pipelines import get_pipeline, PIPELINE_REGISTRY
+from faulttrace_api.database import (
+    ExperimentRow,
+    RunRow,
+    TraceEventRow,
+    get_session_factory,
+    init_db,
+)
+from faulttrace_core.models import GoldAnswer, QuerySpec
+from faulttrace_pipelines import PIPELINE_REGISTRY, get_pipeline
+from pydantic import BaseModel, field_validator
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger("faulttrace.experiments")
 
@@ -29,15 +32,23 @@ logger = logging.getLogger("faulttrace.experiments")
 # Models & Specs
 # ---------------------------------------------------------------------------
 
+
 class ExperimentSpec(BaseModel):
     name: str = "demo_experiment"
     dataset_id: str = "amazon_demo"
-    scales: List[int] = [10, 50]
-    query_families: List[str] = ["count", "mean", "proportion", "comparison", "top_k", "trend"]
-    difficulty_strata: List[str] = ["easy", "medium", "adversarial"]
-    pipelines: List[str] = ["P0-deterministic-scope-baseline", "P1-wrong-scope", "P2-wrong-facts", "P3-wrong-aggregation", "P4-compound-scope-facts", "P5-full-compound"]
-    providers: List[str] = ["deterministic"]
-    models: List[str] = ["gpt-4o-mini"]
+    scales: list[int] = [10, 50]
+    query_families: list[str] = ["count", "mean", "proportion", "comparison", "top_k", "trend"]
+    difficulty_strata: list[str] = ["easy", "medium", "adversarial"]
+    pipelines: list[str] = [
+        "P0-deterministic-scope-baseline",
+        "P1-wrong-scope",
+        "P2-wrong-facts",
+        "P3-wrong-aggregation",
+        "P4-compound-scope-facts",
+        "P5-full-compound",
+    ]
+    providers: list[str] = ["deterministic"]
+    models: list[str] = ["gpt-4o-mini"]
     retriever: str = "bm25"
     top_k: int = 10
     chunk_size: int = 500
@@ -45,16 +56,16 @@ class ExperimentSpec(BaseModel):
     batch_size: int = 10
     repair_policy: str = "strict_exact_v1"
     certificate_policy: str = "strict_exact_v1"
-    seeds: List[int] = [42]
+    seeds: list[int] = [42]
     timeout_seconds: float = 30.0
     retries: int = 3
     cache_policy: str = "use_cache"  # use_cache, recompute
     output_root: str = "artifacts/experiments"
-    tags: List[str] = ["demo"]
+    tags: list[str] = ["demo"]
 
     @field_validator("pipelines")
     @classmethod
-    def validate_pipelines(cls, v: List[str]) -> List[str]:
+    def validate_pipelines(cls, v: list[str]) -> list[str]:
         for p in v:
             if p not in PIPELINE_REGISTRY:
                 raise ValueError(f"Unknown pipeline: {p}. Registered: {list(PIPELINE_REGISTRY)}")
@@ -68,13 +79,17 @@ class ExperimentSpec(BaseModel):
     def validate_compat(self) -> None:
         """Validate incompatible configurations."""
         # Baseline deterministic pipeline cannot run with LLM providers
-        if "P0-deterministic-scope-baseline" in self.pipelines and any(p != "deterministic" for p in self.providers):
+        if "P0-deterministic-scope-baseline" in self.pipelines and any(
+            p != "deterministic" for p in self.providers
+        ):
             # Safe fallback: let provider be deterministic for P0
             pass
+
 
 # ---------------------------------------------------------------------------
 # Job representation
 # ---------------------------------------------------------------------------
+
 
 class Job(BaseModel):
     job_id: str
@@ -86,14 +101,16 @@ class Job(BaseModel):
     provider_id: str
     model: str
     seed: int
-    parameters: Dict[str, Any]
+    parameters: dict[str, Any]
+
 
 # ---------------------------------------------------------------------------
 # Matrix Runner
 # ---------------------------------------------------------------------------
 
+
 class ResumableMatrixRunner:
-    def __init__(self, spec: ExperimentSpec, db_session: Optional[Session] = None):
+    def __init__(self, spec: ExperimentSpec, db_session: Session | None = None):
         self.spec = spec
         self.spec.validate_compat()
         self.config_hash = self.spec.get_config_hash()
@@ -104,24 +121,24 @@ class ResumableMatrixRunner:
     def get_db(self) -> Session:
         if self._db is not None:
             return self._db
-        SessionLocal = get_session_factory()
-        self._db = SessionLocal()
+        session_local = get_session_factory()
+        self._db = session_local()
         return self._db
 
-    def expand_matrix(self) -> List[Job]:
+    def expand_matrix(self) -> list[Job]:
         """Resolves queries from DB matching dataset, families, difficulty and generates the Jobs list."""
         db = self.get_db()
         from faulttrace_api.database import QueryRow, WorldRow
-        
+
         # Load queries
         q_rows = db.query(QueryRow).all()
-        jobs: List[Job] = []
+        jobs: list[Job] = []
 
         for q_row in q_rows:
             # Check family
             if q_row.family not in self.spec.query_families:
                 continue
-            
+
             # Retrieve world scale
             w_row = db.query(WorldRow).filter(WorldRow.world_id == q_row.world_id).first()
             if not w_row:
@@ -157,25 +174,27 @@ class ResumableMatrixRunner:
                             raw_id = f"{q_row.query_id}_{pipeline}_{provider}_{model}_{seed}_{self.config_hash}"
                             job_id = hashlib.md5(raw_id.encode("utf-8")).hexdigest()
 
-                            jobs.append(Job(
-                                job_id=job_id,
-                                experiment_id=self.config_hash,
-                                query_id=q_row.query_id,
-                                world_id=q_row.world_id,
-                                scale_n=w_row.scale_n,
-                                pipeline_id=pipeline,
-                                provider_id=provider,
-                                model=model,
-                                seed=seed,
-                                parameters=job_params
-                            ))
+                            jobs.append(
+                                Job(
+                                    job_id=job_id,
+                                    experiment_id=self.config_hash,
+                                    query_id=q_row.query_id,
+                                    world_id=q_row.world_id,
+                                    scale_n=w_row.scale_n,
+                                    pipeline_id=pipeline,
+                                    provider_id=provider,
+                                    model=model,
+                                    seed=seed,
+                                    parameters=job_params,
+                                )
+                            )
         return jobs
 
-    def dry_run(self) -> Dict[str, Any]:
+    def dry_run(self) -> dict[str, Any]:
         """Provides dry-run sizes and estimated API token cost."""
         jobs = self.expand_matrix()
         total_jobs = len(jobs)
-        
+
         # Estimate simulated tokens
         est_tokens_in = 0
         est_tokens_out = 0
@@ -197,7 +216,7 @@ class ResumableMatrixRunner:
             "estimated_cost_usd": est_cost_usd,
         }
 
-    def run(self, cancel_flag_callback=None) -> Dict[str, Any]:
+    def run(self, cancel_flag_callback=None) -> dict[str, Any]:
         """Runs the entire matrix of jobs. Resumes if previous jobs exist in database."""
         db = self.get_db()
         settings = get_settings()
@@ -206,7 +225,9 @@ class ResumableMatrixRunner:
         total_jobs = len(jobs)
 
         # Upsert Experiment status
-        exp_row = db.query(ExperimentRow).filter(ExperimentRow.experiment_id == self.config_hash).first()
+        exp_row = (
+            db.query(ExperimentRow).filter(ExperimentRow.experiment_id == self.config_hash).first()
+        )
         if not exp_row:
             exp_row = ExperimentRow(
                 experiment_id=self.config_hash,
@@ -216,7 +237,7 @@ class ResumableMatrixRunner:
                 created_at=datetime.utcnow(),
                 total_jobs=total_jobs,
                 completed_jobs=0,
-                failed_jobs=0
+                failed_jobs=0,
             )
             db.add(exp_row)
             db.commit()
@@ -234,16 +255,17 @@ class ResumableMatrixRunner:
 
         for job in jobs:
             if self.is_cancelled or (cancel_flag_callback and cancel_flag_callback()):
-                logger.info(f"Experiment matrix cancelled by user request.")
+                logger.info("Experiment matrix cancelled by user request.")
                 exp_row.status = "cancelled"
                 db.commit()
                 return {"status": "cancelled", "completed": completed_count, "failed": failed_count}
 
             # Check if Job already complete in DB (resumable checkpoint)
-            existing_run = db.query(RunRow).filter(
-                RunRow.run_id == job.job_id,
-                RunRow.status == "completed"
-            ).first()
+            existing_run = (
+                db.query(RunRow)
+                .filter(RunRow.run_id == job.job_id, RunRow.status == "completed")
+                .first()
+            )
 
             if existing_run and self.spec.cache_policy == "use_cache":
                 skipped_count += 1
@@ -252,11 +274,12 @@ class ResumableMatrixRunner:
 
             # Load world records Parquet
             from faulttrace_api.database import QueryRow
+
             q_row = db.query(QueryRow).filter(QueryRow.query_id == job.query_id).first()
             if not q_row:
                 failed_count += 1
                 continue
-            
+
             # Setup world df
             world_dir = settings.data_root / "generated" / "worlds" / job.world_id
             parquet_path = world_dir / "records.parquet"
@@ -269,7 +292,9 @@ class ResumableMatrixRunner:
 
             # Resolve query spec and gold
             query_spec = QuerySpec.model_validate(json.loads(q_row.spec_json))
-            gold = GoldAnswer.model_validate(json.loads(q_row.gold_json)) if q_row.gold_json else None
+            gold = (
+                GoldAnswer.model_validate(json.loads(q_row.gold_json)) if q_row.gold_json else None
+            )
 
             # Setup run record in DB
             run_row = db.query(RunRow).filter(RunRow.run_id == job.job_id).first()
@@ -281,7 +306,7 @@ class ResumableMatrixRunner:
                     pipeline_id=job.pipeline_id,
                     provider_id=job.provider_id,
                     status="pending",
-                    started_at=datetime.utcnow()
+                    started_at=datetime.utcnow(),
                 )
                 db.add(run_row)
                 db.commit()
@@ -294,10 +319,7 @@ class ResumableMatrixRunner:
                     pipeline.top_k = job.parameters["top_k"]
 
                 run_obj, events, components = pipeline.run(
-                    query=query_spec,
-                    df=df,
-                    gold_answer=gold,
-                    parquet_path=parquet_path
+                    query=query_spec, df=df, gold_answer=gold, parquet_path=parquet_path
                 )
 
                 answer = run_obj.answer
@@ -307,9 +329,12 @@ class ResumableMatrixRunner:
                 # Compute policy decision / selective certificates
                 policy_decision = "certified"
                 abstention_reason = None
-                
+
                 # Check for perturbed wrong scope
-                if job.pipeline_id == "P1-wrong-scope" or job.pipeline_id == "P4-compound-scope-facts":
+                if (
+                    job.pipeline_id == "P1-wrong-scope"
+                    or job.pipeline_id == "P4-compound-scope-facts"
+                ):
                     policy_decision = "abstain"
                     abstention_reason = "SCOPE_COVERAGE_UNKNOWN"
 
@@ -323,14 +348,14 @@ class ResumableMatrixRunner:
                 run_row.policy_decision = policy_decision
                 run_row.abstention_reason = abstention_reason
                 run_row.certificate_id = str(uuid.uuid4())
-                run_row.certificate_hash = hashlib.sha256(str(answer).encode('utf-8')).hexdigest()
+                run_row.certificate_hash = hashlib.sha256(str(answer).encode("utf-8")).hexdigest()
                 run_row.completed_at = datetime.utcnow()
 
                 # Add trace events to DB
                 for ev in events:
                     # delete existing event row if exists to avoid primary key conflict
                     db.query(TraceEventRow).filter(TraceEventRow.event_id == ev.event_id).delete()
-                    
+
                     trace_row = TraceEventRow(
                         event_id=ev.event_id,
                         run_id=job.job_id,
@@ -341,8 +366,10 @@ class ResumableMatrixRunner:
                         record_count_in=ev.record_count_in,
                         record_count_out=ev.record_count_out,
                         duration_ms=ev.duration_ms,
-                        payload_json=json.dumps(getattr(ev, "structured_payload", {}) or {}, default=str),
-                        timestamp=datetime.utcnow()
+                        payload_json=json.dumps(
+                            getattr(ev, "structured_payload", {}) or {}, default=str
+                        ),
+                        timestamp=datetime.utcnow(),
                     )
                     db.add(trace_row)
 
@@ -376,5 +403,5 @@ class ResumableMatrixRunner:
             "total_jobs": total_jobs,
             "completed": completed_count,
             "failed": failed_count,
-            "skipped": skipped_count
+            "skipped": skipped_count,
         }

@@ -14,9 +14,7 @@ Also tests:
 
 from __future__ import annotations
 
-import hashlib
 import json
-from pathlib import Path
 
 import pytest
 
@@ -59,9 +57,10 @@ class TestWorldReproducibility:
     def test_world_id_includes_seed_and_scale(self, tmp_path):
         """World IDs must encode seed and scale for auditability."""
         from faulttrace_data.generator import TrackMGenerator
+
         gen = TrackMGenerator(seed=42)
         results = gen.generate_nested_worlds(scales=[10, 50], output_dir=tmp_path)
-        for world, manifest in results:
+        for world, _manifest in results:
             assert "42" in world.world_id  # seed
             assert str(world.scale_n) in world.world_id  # scale
 
@@ -71,15 +70,15 @@ class TestNestednessReproducibility:
 
     def test_nestedness_chain_holds(self, tmp_path):
         """World[n=10] records must all appear in world[n=50]."""
-        from faulttrace_data.generator import TrackMGenerator
         import pandas as pd
+        from faulttrace_data.generator import TrackMGenerator
 
         gen = TrackMGenerator(seed=42)
         results = gen.generate_nested_worlds(scales=[10, 50, 200], output_dir=tmp_path)
 
         # Load each world and check subset relation
         dfs = {}
-        for world, manifest in results:
+        for world, _manifest in results:
             world_dir = tmp_path / world.world_id
             parquet_path = world_dir / "records.parquet"
             if parquet_path.exists():
@@ -93,8 +92,8 @@ class TestNestednessReproducibility:
 
     def test_nestedness_same_across_runs(self, tmp_path):
         """Two independent runs must produce the same nested record ID sets."""
-        from faulttrace_data.generator import TrackMGenerator
         import pandas as pd
+        from faulttrace_data.generator import TrackMGenerator
 
         gen1 = TrackMGenerator(seed=42)
         results1 = gen1.generate_nested_worlds(scales=[10], output_dir=tmp_path / "run1")
@@ -119,7 +118,6 @@ class TestNestednessReproducibility:
     def test_record_count_matches_scale(self, tmp_path):
         """Each world must have exactly scale_n records."""
         from faulttrace_data.generator import TrackMGenerator
-        import pandas as pd
 
         gen = TrackMGenerator(seed=42)
         results = gen.generate_nested_worlds(scales=[10, 50], output_dir=tmp_path)
@@ -133,14 +131,18 @@ class TestQueryReproducibility:
     @pytest.fixture
     def world_data(self, tmp_path):
         from faulttrace_data.generator import TrackMGenerator
+
         gen = TrackMGenerator(seed=42)
-        results = gen.generate_nested_worlds(scales=[50], output_dir=tmp_path / "generated" / "worlds")
+        results = gen.generate_nested_worlds(
+            scales=[50], output_dir=tmp_path / "generated" / "worlds"
+        )
         world, _ = results[0]
         return tmp_path / "generated", world.world_id
 
     def test_query_spec_hash_stable(self, world_data):
         data_dir, world_id = world_data
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries1 = factory.generate_for_world(world_id=world_id, target_count=30)
         queries2 = factory.generate_for_world(world_id=world_id, target_count=30)
@@ -156,16 +158,19 @@ class TestGoldReproducibility:
     @pytest.fixture
     def world_data(self, tmp_path):
         from faulttrace_data.generator import TrackMGenerator
+
         gen = TrackMGenerator(seed=42)
-        results = gen.generate_nested_worlds(scales=[50], output_dir=tmp_path / "generated" / "worlds")
+        results = gen.generate_nested_worlds(
+            scales=[50], output_dir=tmp_path / "generated" / "worlds"
+        )
         world, _ = results[0]
         return tmp_path / "generated", world.world_id
 
     def test_pandas_answer_stable(self, world_data):
         """Pandas evaluator must produce same answer for same query twice."""
         import pandas as pd
-        from faulttrace_pipelines.query_factory import QueryFactory
         from faulttrace_gold.pandas_engine import PandasEvaluator
+        from faulttrace_pipelines.query_factory import QueryFactory
 
         data_dir, world_id = world_data
         factory = QueryFactory(data_dir=data_dir)
@@ -186,8 +191,8 @@ class TestGoldReproducibility:
     def test_duckdb_answer_stable(self, world_data):
         """DuckDB evaluator must produce same answer for same query twice."""
         import pandas as pd
-        from faulttrace_pipelines.query_factory import QueryFactory
         from faulttrace_gold.duckdb_engine import DuckDBEvaluator
+        from faulttrace_pipelines.query_factory import QueryFactory
 
         data_dir, world_id = world_data
         factory = QueryFactory(data_dir=data_dir)
@@ -197,7 +202,7 @@ class TestGoldReproducibility:
         if not parquet_path.exists():
             pytest.skip("No parquet file found")
 
-        df = pd.read_parquet(parquet_path)
+        pd.read_parquet(parquet_path)
         evaluator = DuckDBEvaluator()
 
         for q in queries[:3]:
@@ -212,6 +217,7 @@ class TestSecurityPathTraversal:
     def test_snapshot_fingerprint_not_path(self, tmp_path):
         """Source path fingerprint must not leak absolute path."""
         from faulttrace_data.snapshot import _fingerprint_path
+
         data_root = tmp_path / "data"
         data_root.mkdir()
         evil_path = tmp_path / "../../../etc/passwd"
@@ -224,7 +230,6 @@ class TestSecurityPathTraversal:
     def test_amazon_adapter_refuses_oversized_file(self, tmp_path):
         """Adapter must raise when file exceeds max_bytes limit."""
         from faulttrace_data.amazon_adapter import AmazonLocalAdapter
-        import json
 
         small_limit_adapter = AmazonLocalAdapter(dataset_id="test", max_bytes=5)
         tmp_file = tmp_path / "big.jsonl"
@@ -236,6 +241,7 @@ class TestSecurityPathTraversal:
     def test_world_id_no_path_chars(self, tmp_path):
         """World IDs must not contain path separators or traversal sequences."""
         from faulttrace_data.generator import TrackMGenerator
+
         gen = TrackMGenerator(seed=42)
         results = gen.generate_nested_worlds(scales=[10], output_dir=tmp_path)
         for world, _ in results:
@@ -247,6 +253,7 @@ class TestSecurityPathTraversal:
 class TestSchemaVersionAudit:
     def test_corpus_record_schema_version(self):
         from faulttrace_core.models import SCHEMA_VERSION
+
         # Must follow semver pattern
         parts = SCHEMA_VERSION.split(".")
         assert len(parts) == 3
@@ -255,10 +262,12 @@ class TestSchemaVersionAudit:
 
     def test_snapshot_schema_version(self):
         from faulttrace_data.snapshot import SNAPSHOT_SCHEMA_VERSION
+
         parts = SNAPSHOT_SCHEMA_VERSION.split(".")
         assert len(parts) == 3
 
     def test_world_builder_version(self):
         from faulttrace_data.world_builder import WORLD_BUILDER_VERSION
+
         parts = WORLD_BUILDER_VERSION.split(".")
         assert len(parts) == 3

@@ -1,11 +1,13 @@
-import pytest
-from faulttrace_data.edgar_adapter import EdgarAdapter
-from faulttrace_core.edgar_models import EdgarFact
 from pathlib import Path
+
+from faulttrace_core.edgar_models import EdgarFact
+from faulttrace_data.edgar_adapter import EdgarAdapter
+
 
 def test_edgar_adapter_init():
     adapter = EdgarAdapter(fixtures_dir=Path("/tmp/fixtures"))
     assert str(adapter.fixtures_dir) == str(Path("/tmp/fixtures"))
+
 
 def test_edgar_fact_validation():
     fact = EdgarFact(
@@ -22,7 +24,7 @@ def test_edgar_fact_validation():
         start_date="2023-01-01",
         end_date="2023-12-31",
         raw_payload_hash="mock_hash",
-        canonical_fact_hash="mock_canon_hash"
+        canonical_fact_hash="mock_canon_hash",
     )
     assert fact.cik == "0001234567"
     assert fact.form_type == "10-K"

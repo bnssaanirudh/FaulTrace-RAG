@@ -7,7 +7,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
-from faulttrace_api.database import get_db, QueryRow
+from faulttrace_api.database import QueryRow, get_db
 
 router = APIRouter()
 

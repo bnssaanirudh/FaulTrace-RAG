@@ -20,25 +20,18 @@ from __future__ import annotations
 import random
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
-
 from faulttrace_core.models import (
-    ComparisonSpec,
-    ComponentOutput,
-    CountSpec,
     GoldAnswer,
-    MeanSpec,
-    ProportionSpec,
     QueryFamily,
     QuerySpec,
-    TopKSpec,
-    TrendSpec,
     TraceEventType,
 )
 from faulttrace_core.predicates import compiler
 from faulttrace_gold.pandas_engine import PandasEvaluator
+
 from faulttrace_pipelines.base import AbstractPipeline
 
 PIPELINE_ID = "P3-wrong-aggregation"
@@ -49,7 +42,6 @@ _eval = PandasEvaluator()
 
 def _corrupt_answer(answer: Any, query: QuerySpec, rng: random.Random) -> Any:
     """Apply deterministic corruption to the correct aggregation result."""
-    spec = query.aggregation_spec
     family = query.family
 
     if answer is None:
@@ -117,18 +109,22 @@ class P3WrongAggregation(AbstractPipeline):
         run_id: str,
         query: QuerySpec,
         df: pd.DataFrame,
-        parquet_path: Optional[Path],
-        gold_answer: Optional[GoldAnswer],
+        parquet_path: Path | None,
+        gold_answer: GoldAnswer | None,
     ) -> tuple[Any, list, list, int, int]:
         events: list = []
         components: list = []
 
         # ── Stage 1: query_load ──
-        events.append(self._make_event(
-            run_id, "query_load", TraceEventType.QUERY_LOAD,
-            f"P3 loaded query {query.query_id} family={query.family.value}",
-            payload={"pipeline": self.pipeline_id, "fault": "wrong_aggregation"},
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "query_load",
+                TraceEventType.QUERY_LOAD,
+                f"P3 loaded query {query.query_id} family={query.family.value}",
+                payload={"pipeline": self.pipeline_id, "fault": "wrong_aggregation"},
+            )
+        )
 
         # ── Stage 2: scope_enumerate (correct) ──
         t1 = time.perf_counter()
@@ -136,18 +132,22 @@ class P3WrongAggregation(AbstractPipeline):
         scope_df = df[mask].copy()
         scope_duration = (time.perf_counter() - t1) * 1000
 
-        events.append(self._make_event(
-            run_id, "scope_enumerate", TraceEventType.SCOPE_ENUMERATE,
-            f"Correct scope: {len(scope_df)} records",
-            record_count_in=len(df),
-            record_count_out=len(scope_df),
-            duration_ms=scope_duration,
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "scope_enumerate",
+                TraceEventType.SCOPE_ENUMERATE,
+                f"Correct scope: {len(scope_df)} records",
+                record_count_in=len(df),
+                record_count_out=len(scope_df),
+                duration_ms=scope_duration,
+            )
+        )
 
         scope_path = self.artifacts_dir / run_id / "scope_output.parquet"
         scope_path.parent.mkdir(parents=True, exist_ok=True)
         scope_df.to_parquet(scope_path, index=False)
-        
+
         # ── Stage 3: fact_extract (correct) ──
         t2 = time.perf_counter()
         fields = query.fact_spec.fields
@@ -155,17 +155,21 @@ class P3WrongAggregation(AbstractPipeline):
         extraction_df = scope_df[avail].copy() if avail else scope_df.copy()
         extract_duration = (time.perf_counter() - t2) * 1000
 
-        events.append(self._make_event(
-            run_id, "fact_extract", TraceEventType.FACT_EXTRACT,
-            f"Correct extraction: {len(avail)} fields from {len(extraction_df)} records",
-            record_count_in=len(scope_df),
-            record_count_out=len(extraction_df),
-            duration_ms=extract_duration,
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "fact_extract",
+                TraceEventType.FACT_EXTRACT,
+                f"Correct extraction: {len(avail)} fields from {len(extraction_df)} records",
+                record_count_in=len(scope_df),
+                record_count_out=len(extraction_df),
+                duration_ms=extract_duration,
+            )
+        )
 
         extract_path = self.artifacts_dir / run_id / "extraction.parquet"
         extraction_df.to_parquet(extract_path, index=False)
-        
+
         # ── Stage 4: aggregate (FAULTY — correct computation then corrupted) ──
         t3 = time.perf_counter()
         correct_result = _eval.evaluate(query, df)
@@ -175,25 +179,37 @@ class P3WrongAggregation(AbstractPipeline):
         answer_value = _corrupt_answer(correct_answer, query, rng)
         agg_duration = (time.perf_counter() - t3) * 1000
 
-        events.append(self._make_event(
-            run_id, "aggregate", TraceEventType.AGGREGATE,
-            f"P3 FAULT: correct={correct_answer} → corrupted={answer_value}",
-            duration_ms=agg_duration,
-            payload={
-                "fault_type": "wrong_aggregation",
-                "correct_answer": str(correct_answer),
-                "corrupted_answer": str(answer_value),
-                "family": query.family.value,
-            },
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "aggregate",
+                TraceEventType.AGGREGATE,
+                f"P3 FAULT: correct={correct_answer} → corrupted={answer_value}",
+                duration_ms=agg_duration,
+                payload={
+                    "fault_type": "wrong_aggregation",
+                    "correct_answer": str(correct_answer),
+                    "corrupted_answer": str(answer_value),
+                    "family": query.family.value,
+                },
+            )
+        )
 
-        events.append(self._make_event(
-            run_id, "validate", TraceEventType.VALIDATE,
-            f"Gold: {gold_answer.answer_value if gold_answer else '?'} vs pipeline: {answer_value}",
-        ))
-        events.append(self._make_event(
-            run_id, "persist", TraceEventType.PERSIST,
-            "P3 run artifacts persisted",
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "validate",
+                TraceEventType.VALIDATE,
+                f"Gold: {gold_answer.answer_value if gold_answer else '?'} vs pipeline: {answer_value}",
+            )
+        )
+        events.append(
+            self._make_event(
+                run_id,
+                "persist",
+                TraceEventType.PERSIST,
+                "P3 run artifacts persisted",
+            )
+        )
 
         return answer_value, events, components, 0, 0

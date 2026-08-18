@@ -13,3 +13,7 @@ artifacts/
 data/
 *.egg-info/
 *.zip
+tmp*/
+*.parquet
+patch_tests.py
+check_error.py

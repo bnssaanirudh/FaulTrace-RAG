@@ -4,66 +4,54 @@ Core contract unit tests for FaultTrace-RAG.
 Tests: validation, stable hashing, serialization round trips, invalid predicates.
 """
 
-import hashlib
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
-
 from faulttrace_core.models import (
+    AgreementStatus,
     AndPredicate,
-    AggregationSpec,
-    ComparisonSpec,
     CorpusRecord,
-    CorpusWorld,
     CountSpec,
     EqPredicate,
     FactSpec,
     GoldAnswer,
-    GoldAnswer,
     InPredicate,
     IsNotNullPredicate,
     IsNullPredicate,
-    MeanSpec,
     NeqPredicate,
-    NullPolicy,
     OrPredicate,
     PipelineRun,
-    ProportionSpec,
     QueryFamily,
     QuerySpec,
     RangePredicate,
     RecordCategory,
-    RunStatus,
-    TopKSpec,
-    TrendSpec,
     TraceEvent,
     TraceEventType,
-    AgreementStatus,
 )
-from faulttrace_core.predicates import PredicateCompiler, _validate_field_name
-
+from faulttrace_core.predicates import PredicateCompiler
 
 # ---------------------------------------------------------------------------
 # CorpusRecord tests
 # ---------------------------------------------------------------------------
 
+
 def make_record(**kwargs) -> CorpusRecord:
-    defaults = dict(
-        record_id="rec_0001_000000",
-        source_record_id="R0001_000000",
-        world_id="world_s42_n10",
-        product_id="BABC123456",
-        category=RecordCategory.ELECTRONICS,
-        title="Test Product",
-        brand="TechPrime",
-        rating=4.5,
-        helpful_votes=10,
-        verified_purchase=True,
-        event_time=datetime(2022, 3, 15, tzinfo=timezone.utc),
-        raw_payload_hash="a" * 32,
-    )
+    defaults = {
+        "record_id": "rec_0001_000000",
+        "source_record_id": "R0001_000000",
+        "world_id": "world_s42_n10",
+        "product_id": "BABC123456",
+        "category": RecordCategory.ELECTRONICS,
+        "title": "Test Product",
+        "brand": "TechPrime",
+        "rating": 4.5,
+        "helpful_votes": 10,
+        "verified_purchase": True,
+        "event_time": datetime(2022, 3, 15, tzinfo=UTC),
+        "raw_payload_hash": "a" * 32,
+    }
     defaults.update(kwargs)
     return CorpusRecord(**defaults)
 
@@ -103,6 +91,7 @@ def test_corpus_record_serialization_round_trip():
 # ScopePredicate tests
 # ---------------------------------------------------------------------------
 
+
 def test_eq_predicate_valid():
     p = EqPredicate(field="category", value="Electronics")
     assert p.kind == "eq"
@@ -125,18 +114,22 @@ def test_and_predicate_single_operand_invalid():
 
 
 def test_or_predicate_valid():
-    p = OrPredicate(operands=[
-        EqPredicate(field="category", value="Electronics"),
-        EqPredicate(field="category", value="Books"),
-    ])
+    p = OrPredicate(
+        operands=[
+            EqPredicate(field="category", value="Electronics"),
+            EqPredicate(field="category", value="Books"),
+        ]
+    )
     assert len(p.operands) == 2
 
 
 def test_predicate_serialization():
-    p = AndPredicate(operands=[
-        EqPredicate(field="category", value="Electronics"),
-        RangePredicate(field="rating", low=4.0),
-    ])
+    p = AndPredicate(
+        operands=[
+            EqPredicate(field="category", value="Electronics"),
+            RangePredicate(field="rating", low=4.0),
+        ]
+    )
     data = p.model_dump(mode="json")
     assert data["kind"] == "and"
     assert len(data["operands"]) == 2
@@ -147,24 +140,25 @@ def test_predicate_serialization():
 # ---------------------------------------------------------------------------
 
 import pandas as pd
-import numpy as np
 
 
 @pytest.fixture
 def sample_df() -> pd.DataFrame:
-    return pd.DataFrame({
-        "record_id": ["r1", "r2", "r3", "r4", "r5"],
-        "category": ["Electronics", "Books", "Electronics", "Books", "Electronics"],
-        "rating": [4.5, 3.0, 5.0, 4.0, 2.0],
-        "price": [29.99, None, 49.99, 15.00, None],
-        "verified_purchase": [True, False, True, True, False],
-        "helpful_votes": [10, 0, 5, 2, 0],
-        "event_time": pd.to_datetime([
-            "2022-01-15", "2021-06-20", "2022-07-01", "2020-11-30", "2023-03-10"
-        ], utc=True),
-        "brand": ["TechPrime", "BookCo", "TechPrime", "BookCo", "VoltEdge"],
-        "world_id": ["w1"] * 5,
-    })
+    return pd.DataFrame(
+        {
+            "record_id": ["r1", "r2", "r3", "r4", "r5"],
+            "category": ["Electronics", "Books", "Electronics", "Books", "Electronics"],
+            "rating": [4.5, 3.0, 5.0, 4.0, 2.0],
+            "price": [29.99, None, 49.99, 15.00, None],
+            "verified_purchase": [True, False, True, True, False],
+            "helpful_votes": [10, 0, 5, 2, 0],
+            "event_time": pd.to_datetime(
+                ["2022-01-15", "2021-06-20", "2022-07-01", "2020-11-30", "2023-03-10"], utc=True
+            ),
+            "brand": ["TechPrime", "BookCo", "TechPrime", "BookCo", "VoltEdge"],
+            "world_id": ["w1"] * 5,
+        }
+    )
 
 
 def test_compiler_eq_predicate(sample_df):
@@ -205,20 +199,24 @@ def test_compiler_is_not_null_predicate(sample_df):
 
 def test_compiler_and_predicate(sample_df):
     compiler = PredicateCompiler()
-    pred = AndPredicate(operands=[
-        EqPredicate(field="category", value="Electronics"),
-        EqPredicate(field="verified_purchase", value=True),
-    ])
+    pred = AndPredicate(
+        operands=[
+            EqPredicate(field="category", value="Electronics"),
+            EqPredicate(field="verified_purchase", value=True),
+        ]
+    )
     mask = compiler.to_pandas_mask(pred, sample_df)
     assert mask.sum() == 2  # r1, r3
 
 
 def test_compiler_or_predicate(sample_df):
     compiler = PredicateCompiler()
-    pred = OrPredicate(operands=[
-        EqPredicate(field="category", value="Electronics"),
-        EqPredicate(field="category", value="Books"),
-    ])
+    pred = OrPredicate(
+        operands=[
+            EqPredicate(field="category", value="Electronics"),
+            EqPredicate(field="category", value="Books"),
+        ]
+    )
     mask = compiler.to_pandas_mask(pred, sample_df)
     assert mask.sum() == 5
 
@@ -243,14 +241,14 @@ def test_compiler_disallows_unknown_field():
     compiler = PredicateCompiler()
     with pytest.raises(ValueError, match="not in allowed fields"):
         compiler.to_pandas_mask(
-            EqPredicate(field="__class__", value="x"),
-            pd.DataFrame({"__class__": ["x"]})
+            EqPredicate(field="__class__", value="x"), pd.DataFrame({"__class__": ["x"]})
         )
 
 
 # ---------------------------------------------------------------------------
 # QuerySpec tests
 # ---------------------------------------------------------------------------
+
 
 def test_query_spec_spec_hash_stable():
     q1 = QuerySpec(
@@ -289,6 +287,7 @@ def test_query_spec_question_too_short():
 # GoldAnswer tests
 # ---------------------------------------------------------------------------
 
+
 def test_gold_answer_hash():
     g = GoldAnswer(
         query_id="qid1",
@@ -303,8 +302,9 @@ def test_gold_answer_hash():
 
 
 # ---------------------------------------------------------------------------
-# PipelineRun tests  
+# PipelineRun tests
 # ---------------------------------------------------------------------------
+
 
 def test_pipeline_run_config_hash():
     q = QuerySpec(
@@ -329,6 +329,7 @@ def test_pipeline_run_config_hash():
 # TraceEvent tests
 # ---------------------------------------------------------------------------
 
+
 def test_trace_event_valid():
     ev = TraceEvent(
         run_id="run_001",
@@ -343,6 +344,7 @@ def test_trace_event_valid():
 # ---------------------------------------------------------------------------
 # FactSpec tests
 # ---------------------------------------------------------------------------
+
 
 def test_fact_spec_empty_fields_invalid():
     with pytest.raises(Exception):

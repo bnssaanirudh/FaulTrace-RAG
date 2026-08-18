@@ -4,8 +4,7 @@ Query packs REST API endpoints — Prompt 2 (WP8).
 
 from __future__ import annotations
 
-from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -16,7 +15,7 @@ router = APIRouter()
 
 @router.get("/query-packs", summary="List available query benchmark packs")
 async def list_packs(
-    world_id: Optional[str] = Query(None, description="Filter by world ID"),
+    world_id: str | None = Query(None, description="Filter by world ID"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
 ) -> dict[str, Any]:
@@ -25,28 +24,38 @@ async def list_packs(
     packs_dir = settings.data_root.parent / "artifacts" / "query_packs"
 
     if not packs_dir.exists():
-        return {"items": [], "total": 0, "page": page, "page_size": page_size, "has_next": False, "count": 0}
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size,
+            "has_next": False,
+            "count": 0,
+        }
 
     import json
+
     packs = []
     for pack_path in sorted(packs_dir.glob("pack_*.json")):
         try:
             data = json.loads(pack_path.read_text())
             if world_id and data.get("world_id") != world_id:
                 continue
-            packs.append({
-                "pack_id": data.get("pack_id"),
-                "world_id": data.get("world_id"),
-                "total_count": data.get("total_count"),
-                "agreed_count": data.get("agreed_count"),
-                "disagreed_count": data.get("disagreed_count"),
-                "gold_ready": data.get("gold_ready"),
-                "dev_count": data.get("dev_count"),
-                "val_count": data.get("val_count"),
-                "test_count": data.get("test_count"),
-                "created_at": data.get("created_at"),
-                "file": pack_path.name,
-            })
+            packs.append(
+                {
+                    "pack_id": data.get("pack_id"),
+                    "world_id": data.get("world_id"),
+                    "total_count": data.get("total_count"),
+                    "agreed_count": data.get("agreed_count"),
+                    "disagreed_count": data.get("disagreed_count"),
+                    "gold_ready": data.get("gold_ready"),
+                    "dev_count": data.get("dev_count"),
+                    "val_count": data.get("val_count"),
+                    "test_count": data.get("test_count"),
+                    "created_at": data.get("created_at"),
+                    "file": pack_path.name,
+                }
+            )
         except Exception:
             pass
 
@@ -61,13 +70,14 @@ async def list_packs(
         "page": page,
         "page_size": page_size,
         "has_next": end < total,
-        "count": len(page_packs) # Backwards compatibility
+        "count": len(page_packs),  # Backwards compatibility
     }
 
 
 @router.get("/query-packs/{world_id}", summary="Get a benchmark pack for a world")
 async def get_pack(world_id: str) -> dict[str, Any]:
     import json
+
     settings = get_settings()
     packs_dir = settings.data_root.parent / "artifacts" / "query_packs"
     pack_path = packs_dir / f"pack_{world_id}.json"
@@ -84,6 +94,7 @@ async def get_pack(world_id: str) -> dict[str, Any]:
 @router.get("/query-packs/{world_id}/distribution", summary="Get query distribution for a pack")
 async def get_pack_distribution(world_id: str) -> dict[str, Any]:
     import json
+
     settings = get_settings()
     packs_dir = settings.data_root.parent / "artifacts" / "query_packs"
     pack_path = packs_dir / f"pack_{world_id}.json"
@@ -116,17 +127,20 @@ async def get_pack_distribution(world_id: str) -> dict[str, Any]:
 async def list_templates() -> dict[str, Any]:
     try:
         from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY
+
         entries = []
         for e in TEMPLATE_REGISTRY._entries.values():
-            entries.append({
-                "template_id": e.template_id,
-                "family": e.family,
-                "difficulty": e.difficulty,
-                "selectivity": e.selectivity,
-                "null_risk": e.null_risk,
-                "tie_risk": e.tie_risk,
-                "temporal_risk": e.temporal_risk,
-            })
+            entries.append(
+                {
+                    "template_id": e.template_id,
+                    "family": e.family,
+                    "difficulty": e.difficulty,
+                    "selectivity": e.selectivity,
+                    "null_risk": e.null_risk,
+                    "tie_risk": e.tie_risk,
+                    "temporal_risk": e.temporal_risk,
+                }
+            )
         summary = TEMPLATE_REGISTRY.summary()
         return {
             "summary": summary,

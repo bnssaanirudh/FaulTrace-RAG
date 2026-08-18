@@ -13,52 +13,57 @@ Tests cover:
 
 from __future__ import annotations
 
-import random
-from pathlib import Path
-
 import pytest
-
 from faulttrace_core.models import QueryFamily
 
 
 class TestTemplateRegistry:
     def test_total_template_count(self):
-        from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY, ALL_TEMPLATES
+        from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         total = sum(len(v) for v in ALL_TEMPLATES.values())
         assert total == 100, f"Expected 100 templates, got {total}"
 
     def test_all_six_families_present(self):
         from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY
+
         families = {e.family for e in TEMPLATE_REGISTRY._entries.values()}
         expected = {"count", "mean", "proportion", "comparison", "top_k", "trend"}
         assert expected.issubset(families)
 
     def test_count_family_has_20_templates(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         assert len(ALL_TEMPLATES[QueryFamily.COUNT]) == 20
 
     def test_mean_family_has_15_templates(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         assert len(ALL_TEMPLATES[QueryFamily.MEAN]) == 15
 
     def test_proportion_family_has_20_templates(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         assert len(ALL_TEMPLATES[QueryFamily.PROPORTION]) == 20
 
     def test_comparison_family_has_15_templates(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         assert len(ALL_TEMPLATES[QueryFamily.COMPARISON]) == 15
 
     def test_topk_family_has_15_templates(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         assert len(ALL_TEMPLATES[QueryFamily.TOP_K]) == 15
 
     def test_trend_family_has_15_templates(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         assert len(ALL_TEMPLATES[QueryFamily.TREND]) == 15
 
     def test_all_template_ids_unique(self):
         from faulttrace_pipelines.query_factory import ALL_TEMPLATES
+
         ids = []
         for templates in ALL_TEMPLATES.values():
             for entry in templates:
@@ -67,6 +72,7 @@ class TestTemplateRegistry:
 
     def test_every_entry_has_dimensions(self):
         from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY
+
         required_dims = {"difficulty", "selectivity", "null_risk", "tie_risk", "temporal_risk"}
         for entry in TEMPLATE_REGISTRY._entries.values():
             dims = set(entry.dimensions.keys())
@@ -74,6 +80,7 @@ class TestTemplateRegistry:
 
     def test_registry_summary(self):
         from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY
+
         summary = TEMPLATE_REGISTRY.summary()
         assert summary["total_templates"] == 100
         assert "by_family" in summary
@@ -81,11 +88,13 @@ class TestTemplateRegistry:
 
     def test_list_by_family(self):
         from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY
+
         count_entries = TEMPLATE_REGISTRY.list_by_family(QueryFamily.COUNT)
         assert len(count_entries) == 20
 
     def test_list_by_difficulty(self):
         from faulttrace_pipelines.query_factory import TEMPLATE_REGISTRY
+
         easy = TEMPLATE_REGISTRY.list_by_difficulty("easy")
         medium = TEMPLATE_REGISTRY.list_by_difficulty("medium")
         adversarial = TEMPLATE_REGISTRY.list_by_difficulty("adversarial")
@@ -101,6 +110,7 @@ class TestQueryGeneration:
     def world_dir(self, tmp_path):
         """Create a minimal synthetic world for testing."""
         from faulttrace_data.generator import TrackMGenerator
+
         gen = TrackMGenerator(seed=42)
         worlds_dir = tmp_path / "generated" / "worlds"
         results = gen.generate_nested_worlds(scales=[200], output_dir=worlds_dir)
@@ -110,6 +120,7 @@ class TestQueryGeneration:
     def test_generate_for_world_returns_queries(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=60)
         assert len(queries) > 0
@@ -117,6 +128,7 @@ class TestQueryGeneration:
     def test_queries_cover_all_families(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=120)
         families = {q.family.value for q in queries}
@@ -126,6 +138,7 @@ class TestQueryGeneration:
     def test_spec_hashes_unique(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=60)
         hashes = [q.spec_hash() for q in queries]
@@ -134,6 +147,7 @@ class TestQueryGeneration:
     def test_all_queries_have_valid_world_id(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=60)
         for q in queries:
@@ -142,6 +156,7 @@ class TestQueryGeneration:
     def test_queries_have_template_id(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=60)
         for q in queries:
@@ -151,6 +166,7 @@ class TestQueryGeneration:
     def test_query_natural_language_nonempty(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=60)
         for q in queries:
@@ -161,6 +177,7 @@ class TestBenchmarkPack:
     @pytest.fixture
     def world_dir(self, tmp_path):
         from faulttrace_data.generator import TrackMGenerator
+
         gen = TrackMGenerator(seed=42)
         worlds_dir = tmp_path / "generated" / "worlds"
         results = gen.generate_nested_worlds(scales=[200], output_dir=worlds_dir)
@@ -170,6 +187,7 @@ class TestBenchmarkPack:
     def test_pack_created(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         pack = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
         assert pack.total_count > 0
@@ -178,6 +196,7 @@ class TestBenchmarkPack:
     def test_splits_sum_to_total(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         pack = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
         assert pack.dev_count + pack.val_count + pack.test_count == pack.total_count
@@ -185,6 +204,7 @@ class TestBenchmarkPack:
     def test_split_proportions(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         pack = factory.build_benchmark_pack(world_id=world_id, total_count=100, validate_gold=False)
         # Should be approximately 80/10/10 — allow tolerance
@@ -195,6 +215,7 @@ class TestBenchmarkPack:
         """Two packs with same world_id should have same splits (deterministic via spec_hash)."""
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         pack1 = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
         pack2 = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
@@ -203,6 +224,7 @@ class TestBenchmarkPack:
     def test_pack_has_family_distribution(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         pack = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
         assert len(pack.count_by_family) > 0
@@ -210,6 +232,7 @@ class TestBenchmarkPack:
     def test_no_duplicate_spec_hashes(self, world_dir):
         data_dir, world_id = world_dir
         from faulttrace_pipelines.query_factory import QueryFactory
+
         factory = QueryFactory(data_dir=data_dir)
         pack = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
         # All IDs should be unique (duplicates removed)

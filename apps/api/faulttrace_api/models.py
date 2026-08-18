@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Generic, Optional, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
@@ -13,7 +13,7 @@ T = TypeVar("T")
 class ErrorResponse(BaseModel):
     error: str
     message: str
-    request_id: Optional[str] = None
+    request_id: str | None = None
 
 
 class PaginatedResponse(BaseModel, Generic[T]):
@@ -29,7 +29,7 @@ class WorldResponse(BaseModel):
     dataset_id: str
     seed: int
     scale_n: int
-    parent_world_id: Optional[str] = None
+    parent_world_id: str | None = None
     creation_policy: str
     record_ids_hash: str
     manifest_path: str
@@ -45,7 +45,7 @@ class QueryResponse(BaseModel):
     template_id: str
     version: str
     spec: dict[str, Any]
-    gold: Optional[dict[str, Any]] = None
+    gold: dict[str, Any] | None = None
     created_at: datetime
 
 
@@ -55,28 +55,28 @@ class RunResponse(BaseModel):
     pipeline_id: str
     provider_id: str
     status: str
-    answer: Optional[str] = None
-    gold_answer_value: Optional[str] = None
-    is_correct: Optional[bool] = None
-    loss: Optional[float] = None
-    latency_ms: Optional[float] = None
-    error_message: Optional[str] = None
-    config_hash: Optional[str] = None
+    answer: str | None = None
+    gold_answer_value: str | None = None
+    is_correct: bool | None = None
+    loss: float | None = None
+    latency_ms: float | None = None
+    error_message: str | None = None
+    config_hash: str | None = None
     artifact_refs: dict[str, str] = {}
     started_at: datetime
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
 
 class TraceEventResponse(BaseModel):
     event_id: str
     run_id: str
-    parent_event_id: Optional[str] = None
+    parent_event_id: str | None = None
     stage: str
     event_type: str
     message: str
-    record_count_in: Optional[int] = None
-    record_count_out: Optional[int] = None
-    duration_ms: Optional[float] = None
+    record_count_in: int | None = None
+    record_count_out: int | None = None
+    duration_ms: float | None = None
     payload: dict[str, Any] = {}
     timestamp: datetime
 
@@ -91,7 +91,7 @@ class RecordResponse(BaseModel):
     helpful_votes: int
     verified_purchase: bool
     event_time: datetime
-    price: Optional[float] = None
+    price: float | None = None
     text: str
     world_id: str
 
@@ -105,7 +105,7 @@ class CreateRunRequest(BaseModel):
 class GenerateQueriesRequest(BaseModel):
     world_id: str
     count: int = 60
-    seed: Optional[int] = None
+    seed: int | None = None
 
 
 class SeedDemoRequest(BaseModel):

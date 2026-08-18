@@ -4,13 +4,18 @@ Report Generator: compiles metrics, statistics, and LaTeX fragments into HTML/Ma
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
-from typing import Any, Dict, List
-import pandas as pd
+from typing import Any
+
 
 class ReportGenerator:
-    def __init__(self, experiment_id: str, spec_dict: Dict[str, Any], aggregate_metrics: Dict[str, Any], stats_results: Optional[Dict[str, Any]] = None):
+    def __init__(
+        self,
+        experiment_id: str,
+        spec_dict: dict[str, Any],
+        aggregate_metrics: dict[str, Any],
+        stats_results: dict[str, Any] | None = None,
+    ):
         self.experiment_id = experiment_id
         self.spec = spec_dict
         self.metrics = aggregate_metrics
@@ -18,10 +23,13 @@ class ReportGenerator:
 
     def compile_latex_table(self) -> str:
         """Generates LaTeX code snippet for a publication table."""
-        latex = r"""
+        latex = (
+            r"""
 \begin{table}[h]
 \centering
-\caption{REA Pipeline Performance and Selective Prediction Calibration ($N=""" + str(self.spec.get("scales", [50])[0]) + r"""$)}
+\caption{REA Pipeline Performance and Selective Prediction Calibration ($N="""
+            + str(self.spec.get("scales", [50])[0])
+            + r"""$)}
 \label{tab:pipeline_perf}
 \begin{tabular}{lccccc}
 \hline
@@ -32,9 +40,10 @@ P4 (Compound SF) & 70.0 & 0.0 & 1.000 & 0.50 & 0.50 \\ \hline
 \end{tabular}
 \end{table}
 """
+        )
         return latex.strip()
 
-    def generate(self, output_dir: Path) -> Tuple[Path, Path]:
+    def generate(self, output_dir: Path) -> tuple[Path, Path]:
         output_dir.mkdir(parents=True, exist_ok=True)
         md_path = output_dir / "report.md"
         html_path = output_dir / "report.html"
@@ -44,9 +53,9 @@ P4 (Compound SF) & 70.0 & 0.0 & 1.000 & 0.50 & 0.50 \\ \hline
         # Compile Markdown
         md_content = f"""# FaultTrace-RAG Experiment Research Report
 
-**Experiment ID:** `{self.experiment_id}`  
-**Dataset snapshot:** `{self.spec.get("dataset_id")}`  
-**Status:** Completed  
+**Experiment ID:** `{self.experiment_id}`
+**Dataset snapshot:** `{self.spec.get("dataset_id")}`
+**Status:** Completed
 
 ---
 
@@ -71,8 +80,8 @@ P4 (Compound SF) & 70.0 & 0.0 & 1.000 & 0.50 & 0.50 \\ \hline
 ---
 
 ## 3. Configuration Metadata
-- **Pipelines Swept:** {', '.join(self.spec.get("pipelines", []))}
-- **Models Used:** {', '.join(self.spec.get("models", []))}
+- **Pipelines Swept:** {", ".join(self.spec.get("pipelines", []))}
+- **Models Used:** {", ".join(self.spec.get("models", []))}
 - **Certificate Policy:** `{self.spec.get("certificate_policy")}`
 """
 
@@ -96,7 +105,7 @@ P4 (Compound SF) & 70.0 & 0.0 & 1.000 & 0.50 & 0.50 \\ \hline
 <body>
     <h1>FaultTrace-RAG Experiment Research Report</h1>
     <p><strong>Experiment ID:</strong> <code>{self.experiment_id}</code></p>
-    
+
     <h2>1. Executive Summary & Metrics</h2>
     <table>
         <tr><th>Metric</th><th>Value</th></tr>

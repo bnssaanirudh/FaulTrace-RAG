@@ -1,13 +1,13 @@
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 import tiktoken
+from faulttrace_core.llm import ModelOutput, ModelProvider, ProviderConfig, register_provider
 from openai import OpenAI, OpenAIError
 
-from faulttrace_core.llm import ModelProvider, ProviderConfig, ModelOutput, register_provider
-
 logger = logging.getLogger(__name__)
+
 
 class OpenAIProvider(ModelProvider):
     """
@@ -20,7 +20,7 @@ class OpenAIProvider(ModelProvider):
         return "openai"
 
     def generate(self, prompt: str, config: ProviderConfig) -> ModelOutput:
-        client_kwargs: Dict[str, Any] = {}
+        client_kwargs: dict[str, Any] = {}
         if config.endpoint_url:
             client_kwargs["base_url"] = config.endpoint_url
             # Ollama requires an API key, even if empty or dummy
@@ -34,14 +34,12 @@ class OpenAIProvider(ModelProvider):
                 raw_response="",
                 rejected_reason=f"client_init_error: {str(e)}",
                 provider_name=self.provider_id(),
-                model_id=config.model_id
+                model_id=config.model_id,
             )
 
-        messages = [
-            {"role": "user", "content": prompt}
-        ]
+        messages = [{"role": "user", "content": prompt}]
 
-        kwargs: Dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "model": config.model_id,
             "messages": messages,
             "temperature": config.temperature,
@@ -55,15 +53,15 @@ class OpenAIProvider(ModelProvider):
                 "json_schema": {
                     "name": config.structured_schema_name or "output",
                     "schema": config.structured_schema,
-                    "strict": True
-                }
+                    "strict": True,
+                },
             }
 
         prompt_tokens = 0
         completion_tokens = 0
         raw_response = ""
-        parsed_json: Optional[Dict[str, Any]] = None
-        rejected_reason: Optional[str] = None
+        parsed_json: dict[str, Any] | None = None
+        rejected_reason: str | None = None
 
         try:
             response = client.chat.completions.create(**kwargs)
@@ -73,13 +71,13 @@ class OpenAIProvider(ModelProvider):
 
             choice = response.choices[0]
             raw_response = choice.message.content or ""
-            
+
             if config.structured_schema:
                 try:
                     parsed_json = json.loads(raw_response)
                 except json.JSONDecodeError as e:
                     rejected_reason = f"json_parse_error: {str(e)}"
-        
+
         except OpenAIError as e:
             logger.error(f"OpenAI generation error: {e}")
             rejected_reason = f"api_error: {str(e)}"
@@ -94,7 +92,7 @@ class OpenAIProvider(ModelProvider):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             provider_name=self.provider_id(),
-            model_id=config.model_id
+            model_id=config.model_id,
         )
 
     def estimate_tokens(self, text: str) -> int:
@@ -103,6 +101,7 @@ class OpenAIProvider(ModelProvider):
             return len(encoding.encode(text))
         except Exception:
             return max(1, len(text) // 4)
+
 
 # Auto-register
 register_provider(OpenAIProvider)

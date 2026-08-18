@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from faulttrace_api.config import get_settings
-from faulttrace_api.database import get_db, RunRow
+from faulttrace_api.database import RunRow, get_db
 
 router = APIRouter()
 
@@ -18,8 +18,8 @@ router = APIRouter()
 @router.get("/artifacts/{artifact_id}/metadata", summary="Get artifact metadata")
 async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db)):
     """Get metadata for a run artifact by run_id."""
-    settings = get_settings()
-    
+    get_settings()
+
     # Check if it's a run artifact
     run = db.query(RunRow).filter(RunRow.run_id == artifact_id).first()
     if run:
@@ -34,7 +34,7 @@ async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db))
                     for chunk in iter(lambda: f.read(4096), b""):
                         hasher.update(chunk)
                 sha256 = hasher.hexdigest()
-            
+
             artifact_info[name] = {
                 "path": path_str,
                 "exists": p.exists(),
@@ -47,5 +47,5 @@ async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db))
             "run_id": run.run_id,
             "artifacts": artifact_info,
         }
-    
+
     raise HTTPException(status_code=404, detail=f"Artifact '{artifact_id}' not found")

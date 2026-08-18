@@ -24,9 +24,18 @@ Query:
 {query}
 """
 
+
 def build_direct_prompt(question: str, context: str) -> str:
-    return Prompts.DIRECT_QA_SYSTEM + "\n\n" + Prompts.DIRECT_QA_USER.format(context=context, question=question)
+    return (
+        Prompts.DIRECT_QA_SYSTEM
+        + "\n\n"
+        + Prompts.DIRECT_QA_USER.format(context=context, question=question)
+    )
+
 
 def build_extract_prompt(document: str, query: str) -> str:
-    return Prompts.EXTRACTION_SYSTEM + "\n\n" + Prompts.EXTRACTION_USER.format(document=document, query=query)
-
+    return (
+        Prompts.EXTRACTION_SYSTEM
+        + "\n\n"
+        + Prompts.EXTRACTION_USER.format(document=document, query=query)
+    )

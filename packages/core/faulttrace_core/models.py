@@ -8,12 +8,11 @@ Models are independent of FastAPI and persistence layers.
 from __future__ import annotations
 
 import hashlib
-import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
-from typing import Any, Literal, Optional, Union
-from uuid import UUID, uuid4
+from enum import StrEnum
+from typing import Any, Literal, Union
+from uuid import uuid4
 
 import orjson
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -26,7 +25,7 @@ SCHEMA_VERSION = "1.0.0"
 # ---------------------------------------------------------------------------
 
 
-class RecordCategory(str, Enum):
+class RecordCategory(StrEnum):
     ELECTRONICS = "Electronics"
     BOOKS = "Books"
     HOME_KITCHEN = "Home & Kitchen"
@@ -39,7 +38,7 @@ class RecordCategory(str, Enum):
     OFFICE = "Office Products"
 
 
-class QueryFamily(str, Enum):
+class QueryFamily(StrEnum):
     COUNT = "count"
     MEAN = "mean"
     PROPORTION = "proportion"
@@ -48,7 +47,7 @@ class QueryFamily(str, Enum):
     TREND = "trend"
 
 
-class AggregationKind(str, Enum):
+class AggregationKind(StrEnum):
     COUNT = "count"
     SUM = "sum"
     MEAN = "mean"
@@ -58,7 +57,7 @@ class AggregationKind(str, Enum):
     TREND = "trend"
 
 
-class RunStatus(str, Enum):
+class RunStatus(StrEnum):
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -66,7 +65,7 @@ class RunStatus(str, Enum):
     ABORTED = "aborted"
 
 
-class TraceEventType(str, Enum):
+class TraceEventType(StrEnum):
     QUERY_LOAD = "query_load"
     SCOPE_ENUMERATE = "scope_enumerate"
     FACT_EXTRACT = "fact_extract"
@@ -76,14 +75,14 @@ class TraceEventType(str, Enum):
     ERROR = "error"
 
 
-class AgreementStatus(str, Enum):
+class AgreementStatus(StrEnum):
     AGREED = "agreed"
     DISAGREED = "disagreed"
     SINGLE_ENGINE = "single_engine"
     NOT_COMPUTED = "not_computed"
 
 
-class ReasonCode(str, Enum):
+class ReasonCode(StrEnum):
     SCOPE_NOT_ENUMERATED = "SCOPE_NOT_ENUMERATED"
     SCOPE_COVERAGE_BELOW_REQUIRED = "SCOPE_COVERAGE_BELOW_REQUIRED"
     SCOPE_COVERAGE_UNKNOWN = "SCOPE_COVERAGE_UNKNOWN"
@@ -100,7 +99,7 @@ class ReasonCode(str, Enum):
     CERTIFIED = "CERTIFIED"
 
 
-class CoverageDecision(str, Enum):
+class CoverageDecision(StrEnum):
     CERTIFIED = "certified"
     ABSTAIN = "abstain"
     PARTIAL = "partial"
@@ -109,19 +108,19 @@ class CoverageDecision(str, Enum):
     NOT_APPLICABLE = "not_applicable"
 
 
-class NullPolicy(str, Enum):
+class NullPolicy(StrEnum):
     EXCLUDE = "exclude"
     INCLUDE_AS_ZERO = "include_as_zero"
     INCLUDE_AS_NULL = "include_as_null"
 
 
-class TiePolicy(str, Enum):
+class TiePolicy(StrEnum):
     FIRST = "first"
     ALL = "all"
     RANDOM_STABLE = "random_stable"
 
 
-class FailureCode(str, Enum):
+class FailureCode(StrEnum):
     SCOPE_COMPILATION_FAILURE = "scope_compilation_failure"
     UNSUPPORTED_SEMANTIC_PREDICATE = "unsupported_semantic_predicate"
     RENDERING_FAILURE = "rendering_failure"
@@ -137,7 +136,7 @@ class FailureCode(str, Enum):
     ARTIFACT_INTEGRITY_FAILURE = "artifact_integrity_failure"
 
 
-class RepairReason(str, Enum):
+class RepairReason(StrEnum):
     INVALID_JSON = "invalid_json"
     MISSING_REQUIRED_FIELD = "missing_required_field"
     WRONG_PRIMITIVE_TYPE = "wrong_primitive_type"
@@ -158,7 +157,7 @@ def _stable_hash(data: Any) -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 # ---------------------------------------------------------------------------
@@ -176,7 +175,7 @@ class CorpusRecord(BaseModel):
     source_record_id: str = Field(..., description="Original ID in the source dataset")
     world_id: str = Field(..., description="Corpus world this record belongs to")
     product_id: str = Field(..., description="Product ASIN or synthetic equivalent")
-    parent_id: Optional[str] = Field(None, description="Parent ASIN for product variants")
+    parent_id: str | None = Field(None, description="Parent ASIN for product variants")
     category: RecordCategory = Field(..., description="Top-level product category")
     title: str = Field(..., description="Product title")
     brand: str = Field(..., description="Brand name")
@@ -184,7 +183,7 @@ class CorpusRecord(BaseModel):
     helpful_votes: int = Field(default=0, ge=0, description="Number of helpful votes")
     verified_purchase: bool = Field(..., description="Whether purchase was verified")
     event_time: datetime = Field(..., description="Review timestamp")
-    price: Optional[Decimal] = Field(None, description="Product price (may be missing)")
+    price: Decimal | None = Field(None, description="Product price (may be missing)")
     attributes: dict[str, Any] = Field(default_factory=dict, description="Extensible attributes")
     text: str = Field(default="", description="Review text stub")
     raw_payload_hash: str = Field(..., description="SHA-256 hash of original payload")
@@ -231,7 +230,7 @@ class CorpusWorld(BaseModel):
     dataset_id: str = Field(default="track_m", description="Originating dataset")
     seed: int = Field(..., description="RNG seed for determinism")
     scale_n: int = Field(..., gt=0, description="Number of records")
-    parent_world_id: Optional[str] = Field(
+    parent_world_id: str | None = Field(
         None, description="Parent world at smaller N (for nestedness)"
     )
     creation_policy: str = Field(
@@ -307,13 +306,13 @@ class RangePredicate(BaseModel):
 
     kind: Literal["range"] = "range"
     field: str
-    low: Optional[Any] = None
-    high: Optional[Any] = None
+    low: Any | None = None
+    high: Any | None = None
     low_inclusive: bool = True
     high_inclusive: bool = True
 
     @model_validator(mode="after")
-    def validate_range(self) -> "RangePredicate":
+    def validate_range(self) -> RangePredicate:
         if self.low is None and self.high is None:
             raise ValueError("RangePredicate must have at least one of low or high")
         return self
@@ -337,7 +336,7 @@ class AndPredicate(BaseModel):
     """Conjunction of predicates"""
 
     kind: Literal["and"] = "and"
-    operands: list["ScopePredicate"]
+    operands: list[ScopePredicate]
 
     @field_validator("operands")
     @classmethod
@@ -351,7 +350,7 @@ class OrPredicate(BaseModel):
     """Disjunction of predicates"""
 
     kind: Literal["or"] = "or"
-    operands: list["ScopePredicate"]
+    operands: list[ScopePredicate]
 
     @field_validator("operands")
     @classmethod
@@ -419,7 +418,7 @@ class FactSpec(BaseModel):
 class CountSpec(BaseModel):
     kind: Literal["count"] = "count"
     distinct: bool = False
-    field: Optional[str] = None
+    field: str | None = None
 
 
 class SumSpec(BaseModel):
@@ -445,7 +444,7 @@ class ProportionSpec(BaseModel):
 class ComparisonSpec(BaseModel):
     kind: Literal["comparison"] = "comparison"
     measure: Literal["count", "mean", "sum"] = "mean"
-    field: Optional[str] = None
+    field: str | None = None
     group_a_predicate: ScopePredicate
     group_b_predicate: ScopePredicate
     output: Literal["difference", "ratio", "both"] = "difference"
@@ -455,7 +454,7 @@ class TopKSpec(BaseModel):
     kind: Literal["top_k"] = "top_k"
     group_by_field: str
     measure: Literal["count", "mean", "sum"] = "count"
-    value_field: Optional[str] = None
+    value_field: str | None = None
     k: int = Field(..., ge=1)
     ascending: bool = False
     tie_policy: TiePolicy = TiePolicy.FIRST
@@ -473,7 +472,7 @@ class TrendSpec(BaseModel):
     time_field: str = "event_time"
     bucket: Literal["month", "quarter", "year"] = "month"
     measure: Literal["count", "mean", "sum"] = "count"
-    value_field: Optional[str] = None
+    value_field: str | None = None
     null_policy: NullPolicy = NullPolicy.EXCLUDE
 
 
@@ -507,16 +506,14 @@ class QuerySpec(BaseModel):
     created_at: datetime = Field(default_factory=_utcnow)
 
     # Prompt 2 additions (all optional, backward-compatible)
-    dataset_snapshot_id: Optional[str] = Field(
+    dataset_snapshot_id: str | None = Field(
         None, description="Snapshot ID if query was generated from an ingested dataset"
     )
-    difficulty: Optional[str] = Field(
+    difficulty: str | None = Field(
         None, description="Difficulty dimension: easy, medium, adversarial"
     )
-    split: Optional[str] = Field(
-        None, description="Dataset split: dev, val, test"
-    )
-    selectivity: Optional[str] = Field(
+    split: str | None = Field(None, description="Dataset split: dev, val, test")
+    selectivity: str | None = Field(
         None, description="Selectivity dimension: broad, narrow, selective"
     )
 
@@ -548,8 +545,8 @@ class GoldAnswer(BaseModel):
     # Answer values
     answer_value: Any = Field(..., description="The primary answer value")
     answer_typed: Any = Field(None, description="Type-coerced representation")
-    denominator: Optional[int] = Field(None, description="Denominator for proportions")
-    numerator: Optional[int] = Field(None, description="Numerator for proportions")
+    denominator: int | None = Field(None, description="Denominator for proportions")
+    numerator: int | None = Field(None, description="Numerator for proportions")
 
     # Evidence
     eligible_record_count: int = Field(..., ge=0)
@@ -568,21 +565,19 @@ class GoldAnswer(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION)
 
     # Prompt 2 additions (all optional, backward-compatible)
-    eligibility_trace: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="Trace of eligibility filtering for denominator computation"
+    eligibility_trace: dict[str, Any] | None = Field(
+        default=None, description="Trace of eligibility filtering for denominator computation"
     )
-    denominator_trace: Optional[dict[str, Any]] = Field(
+    denominator_trace: dict[str, Any] | None = Field(
         default=None,
-        description="Explicit denominator predicate and count for proportion/ranking queries"
+        description="Explicit denominator predicate and count for proportion/ranking queries",
     )
-    tie_resolution_record: Optional[dict[str, Any]] = Field(
-        default=None,
-        description="Tie-resolution details for top-k and comparison queries"
+    tie_resolution_record: dict[str, Any] | None = Field(
+        default=None, description="Tie-resolution details for top-k and comparison queries"
     )
-    disagreement_diagnostic: Optional[dict[str, Any]] = Field(
+    disagreement_diagnostic: dict[str, Any] | None = Field(
         default=None,
-        description="Intermediate table hashes and engine states when Pandas/DuckDB disagree"
+        description="Intermediate table hashes and engine states when Pandas/DuckDB disagree",
     )
 
     def answer_hash(self) -> str:
@@ -609,25 +604,25 @@ class PipelineRun(BaseModel):
     provider_id: str = Field(default="deterministic")
 
     started_at: datetime = Field(default_factory=_utcnow)
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
 
     status: RunStatus = RunStatus.PENDING
     answer: Any = Field(None, description="Pipeline's final answer")
     gold_answer_value: Any = Field(None, description="Gold answer for comparison")
 
     # Quality metrics
-    is_correct: Optional[bool] = None
-    is_within_tolerance: Optional[bool] = None
-    loss: Optional[float] = None
-    latency_ms: Optional[float] = None
+    is_correct: bool | None = None
+    is_within_tolerance: bool | None = None
+    loss: float | None = None
+    latency_ms: float | None = None
 
     # Cost estimates
     token_estimate_input: int = 0
     token_estimate_output: int = 0
 
     # Error state
-    error_message: Optional[str] = None
-    error_stage: Optional[str] = None
+    error_message: str | None = None
+    error_stage: str | None = None
 
     # Artifacts
     artifact_references: dict[str, str] = Field(
@@ -639,11 +634,15 @@ class PipelineRun(BaseModel):
 
     # Certification (Prompt 6)
     raw_answer: Any = Field(None, description="Pipeline's uncertified raw answer")
-    policy_decision: Optional[str] = Field(None, description="CERTIFIED, ABSTAIN, PARTIAL, UNCERTIFIED")
-    final_presented_answer: Any = Field(None, description="The answer actually presented to the user under policy")
-    abstention_reason: Optional[str] = None
-    certificate_id: Optional[str] = None
-    certificate_hash: Optional[str] = None
+    policy_decision: str | None = Field(
+        None, description="CERTIFIED, ABSTAIN, PARTIAL, UNCERTIFIED"
+    )
+    final_presented_answer: Any = Field(
+        None, description="The answer actually presented to the user under policy"
+    )
+    abstention_reason: str | None = None
+    certificate_id: str | None = None
+    certificate_hash: str | None = None
 
     schema_version: str = Field(default=SCHEMA_VERSION)
 
@@ -664,6 +663,7 @@ class PipelineRun(BaseModel):
 
 class ExtractionUnit(BaseModel):
     """A single deterministic batch of records for extraction."""
+
     unit_id: str = Field(default_factory=lambda: str(uuid4()))
     run_id: str
     record_ids: list[str] = Field(..., description="IDs to extract in this batch")
@@ -671,11 +671,12 @@ class ExtractionUnit(BaseModel):
     token_estimate: int = 0
     status: RunStatus = RunStatus.PENDING
     cached: bool = False
-    cache_key: Optional[str] = None
+    cache_key: str | None = None
 
 
 class MapPlan(BaseModel):
     """The complete extraction plan for a query."""
+
     plan_id: str = Field(default_factory=lambda: str(uuid4()))
     run_id: str
     world_id: str
@@ -698,8 +699,9 @@ class RepairAttempt(BaseModel):
 
 class RepairState(BaseModel):
     """The strict state machine tracking for a single extraction unit."""
+
     unit_id: str
-    original_failure_reason: Optional[RepairReason] = None
+    original_failure_reason: RepairReason | None = None
     attempts: list[RepairAttempt] = Field(default_factory=list)
     final_status: Literal["success", "failed_permanent"] = "success"
     max_attempts: int = 2
@@ -715,21 +717,21 @@ class TraceEvent(BaseModel):
 
     event_id: str = Field(default_factory=lambda: str(uuid4()))
     run_id: str
-    parent_event_id: Optional[str] = None
+    parent_event_id: str | None = None
 
     timestamp: datetime = Field(default_factory=_utcnow)
     stage: str
     event_type: TraceEventType
 
-    input_artifact_hash: Optional[str] = None
-    output_artifact_hash: Optional[str] = None
-    record_count_in: Optional[int] = None
-    record_count_out: Optional[int] = None
+    input_artifact_hash: str | None = None
+    output_artifact_hash: str | None = None
+    record_count_in: int | None = None
+    record_count_out: int | None = None
 
     message: str = ""
     structured_payload: dict[str, Any] = Field(default_factory=dict)
 
-    duration_ms: Optional[float] = None
+    duration_ms: float | None = None
     schema_version: str = Field(default=SCHEMA_VERSION)
 
 
@@ -746,44 +748,43 @@ class ComponentOutput(BaseModel):
     stage_index: int
 
     # Retrieval / scope output
-    scope_record_ids: Optional[list[str]] = None
-    scope_record_count: Optional[int] = None
-    scope_artifact_hash: Optional[str] = None
+    scope_record_ids: list[str] | None = None
+    scope_record_count: int | None = None
+    scope_artifact_hash: str | None = None
 
     # Extraction output
-    extraction_rows: Optional[list[dict[str, Any]]] = None
-    extraction_row_count: Optional[int] = None
-    extraction_artifact_hash: Optional[str] = None
+    extraction_rows: list[dict[str, Any]] | None = None
+    extraction_row_count: int | None = None
+    extraction_artifact_hash: str | None = None
 
     # Aggregation output
-    aggregation_plan: Optional[dict[str, Any]] = None
-    aggregation_result: Optional[Any] = None
-    aggregation_artifact_hash: Optional[str] = None
+    aggregation_plan: dict[str, Any] | None = None
+    aggregation_result: Any | None = None
+    aggregation_artifact_hash: str | None = None
 
     # Validation
-    validation_passed: Optional[bool] = None
-    validation_message: Optional[str] = None
-    validation_artifact_hash: Optional[str] = None
+    validation_passed: bool | None = None
+    validation_message: str | None = None
+    validation_artifact_hash: str | None = None
 
     created_at: datetime = Field(default_factory=_utcnow)
 
 
 class EvidenceRequirement(BaseModel):
     """Operator-specific evidence completeness requirements."""
+
     requirement_type: Literal["exact", "lower_bound", "sample", "unknown"] = "exact"
     requires_full_scope: bool = True
-    required_scope_count: Optional[int] = None
-    required_denominator: Optional[int] = None
+    required_scope_count: int | None = None
+    required_denominator: int | None = None
     required_tie_resolution: bool = False
-    required_time_buckets: Optional[list[str]] = None
-    
+    required_time_buckets: list[str] | None = None
+
     @classmethod
-    def from_query(cls, query: QuerySpec) -> "EvidenceRequirement":
+    def from_query(cls, query: QuerySpec) -> EvidenceRequirement:
         """Generate conservative requirements from the query spec."""
         req = cls()
-        if isinstance(query.aggregation_spec, (CountSpec, SumSpec)):
-            req.requires_full_scope = True
-        elif isinstance(query.aggregation_spec, ProportionSpec):
+        if isinstance(query.aggregation_spec, (CountSpec, SumSpec, ProportionSpec)):
             req.requires_full_scope = True
         elif isinstance(query.aggregation_spec, TopKSpec):
             req.requires_full_scope = True
@@ -795,9 +796,10 @@ class EvidenceRequirement(BaseModel):
 
 class CoverageObservation(BaseModel):
     """Pipeline observations measuring evidence completeness."""
-    known_world_size: Optional[int] = None
+
+    known_world_size: int | None = None
     eligible_set_size_known: bool = False
-    eligible_set_size: Optional[int] = None
+    eligible_set_size: int | None = None
     retrieved_units: int = 0
     unique_represented_record_ids: int = 0
     extracted_valid_rows: int = 0
@@ -806,8 +808,8 @@ class CoverageObservation(BaseModel):
     missing_required_fields: int = 0
     denominator_evaluable: bool = False
     numerator_evaluable: bool = False
-    time_bucket_completeness: Optional[float] = None
-    ranking_candidate_completeness: Optional[float] = None
+    time_bucket_completeness: float | None = None
+    ranking_candidate_completeness: float | None = None
     tie_boundary_completeness: bool = False
     truncation_count: int = 0
     dropped_context_count: int = 0
@@ -815,6 +817,7 @@ class CoverageObservation(BaseModel):
 
 class AnswerPolicyConfig(BaseModel):
     """Thresholds and configurations for answer policies."""
+
     policy_id: str
     version: str = "1.0"
     min_known_scope_coverage: float = 1.0
@@ -828,33 +831,34 @@ class AnswerPolicyConfig(BaseModel):
 
 class CoverageCertificate(BaseModel):
     """Immutable evidence coverage certificate for a pipeline run."""
+
     certificate_id: str = Field(default_factory=lambda: str(uuid4()))
     schema_version: str = Field(default=SCHEMA_VERSION)
-    
+
     run_id: str
     query_id: str
     world_id: str
     pipeline_id: str
     config_hash: str
-    
+
     evidence_requirement: EvidenceRequirement
     observations: CoverageObservation
-    
+
     coverage_ratios: dict[str, float] = Field(default_factory=dict)
     unknown_dimensions: list[str] = Field(default_factory=list)
-    
+
     decision: CoverageDecision = CoverageDecision.UNCERTIFIED
     reason_codes: list[ReasonCode] = Field(default_factory=list)
     human_readable_explanation: str = ""
-    
+
     policy_id: str = ""
     policy_version: str = ""
-    
+
     artifact_lineage: dict[str, str] = Field(default_factory=dict)
     certificate_hash: str = ""
 
     @model_validator(mode="after")
-    def compute_certificate_hash(self) -> "CoverageCertificate":
+    def compute_certificate_hash(self) -> CoverageCertificate:
         if not self.certificate_hash:
             data = {
                 "run_id": self.run_id,

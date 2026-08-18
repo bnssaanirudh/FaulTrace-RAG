@@ -6,21 +6,16 @@ Tests: count, mean, proportion, comparison, top-k, trend, nulls, ties, boundary 
 
 from __future__ import annotations
 
-import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
 import pytest
-
 from faulttrace_core.models import (
-    AndPredicate,
     ComparisonSpec,
     CountSpec,
     EqPredicate,
     FactSpec,
     IsNotNullPredicate,
-    IsNullPredicate,
     MeanSpec,
     NullPolicy,
     ProportionSpec,
@@ -31,53 +26,142 @@ from faulttrace_core.models import (
     TopKSpec,
     TrendSpec,
 )
-from faulttrace_gold.pandas_engine import PandasEvaluator
 from faulttrace_gold.duckdb_engine import DuckDBEvaluator
+from faulttrace_gold.pandas_engine import PandasEvaluator
 from faulttrace_gold.validator import GoldValidator, _results_agree
 
 
 @pytest.fixture
 def sample_df() -> pd.DataFrame:
     """Sample corpus DataFrame for testing."""
-    return pd.DataFrame({
-        "record_id": [f"r{i}" for i in range(20)],
-        "category": (
-            ["Electronics"] * 8 + ["Books"] * 7 + ["Sports"] * 5
-        ),
-        "brand": (
-            ["TechPrime"] * 5 + ["VoltEdge"] * 3 +
-            ["BookCo"] * 4 + ["LitGuild"] * 3 +
-            ["SportPeak"] * 3 + ["FitCore"] * 2
-        ),
-        "rating": [
-            4.5, 5.0, 3.0, 4.0, 2.0, 4.5, 5.0, 3.5,  # Electronics
-            4.0, 3.0, 5.0, 4.5, 2.0, 3.5, 4.0,        # Books
-            3.0, 4.0, 5.0, 3.5, 4.0,                   # Sports
-        ],
-        "price": [
-            29.99, 49.99, None, 19.99, 9.99, 39.99, 59.99, None,
-            14.99, 9.99, 24.99, None, 7.99, 12.99, 19.99,
-            49.99, 29.99, 79.99, None, 39.99,
-        ],
-        "verified_purchase": [
-            True, True, False, True, False, True, True, False,
-            True, False, True, True, False, True, True,
-            True, True, False, True, True,
-        ],
-        "helpful_votes": [
-            10, 0, 5, 2, 0, 8, 15, 1,
-            3, 0, 7, 4, 0, 2, 5,
-            0, 6, 12, 0, 3,
-        ],
-        "event_time": pd.to_datetime([
-            "2022-01-15", "2022-03-20", "2021-11-05", "2022-06-01",
-            "2020-08-15", "2022-12-31", "2023-01-01", "2021-06-20",
-            "2022-04-10", "2021-09-15", "2022-07-20", "2020-12-01",
-            "2023-02-14", "2022-11-30", "2021-03-05",
-            "2022-05-20", "2021-12-10", "2022-08-08", "2020-10-25", "2023-03-15",
-        ], utc=True),
-        "world_id": ["test_world"] * 20,
-    })
+    return pd.DataFrame(
+        {
+            "record_id": [f"r{i}" for i in range(20)],
+            "category": (["Electronics"] * 8 + ["Books"] * 7 + ["Sports"] * 5),
+            "brand": (
+                ["TechPrime"] * 5
+                + ["VoltEdge"] * 3
+                + ["BookCo"] * 4
+                + ["LitGuild"] * 3
+                + ["SportPeak"] * 3
+                + ["FitCore"] * 2
+            ),
+            "rating": [
+                4.5,
+                5.0,
+                3.0,
+                4.0,
+                2.0,
+                4.5,
+                5.0,
+                3.5,  # Electronics
+                4.0,
+                3.0,
+                5.0,
+                4.5,
+                2.0,
+                3.5,
+                4.0,  # Books
+                3.0,
+                4.0,
+                5.0,
+                3.5,
+                4.0,  # Sports
+            ],
+            "price": [
+                29.99,
+                49.99,
+                None,
+                19.99,
+                9.99,
+                39.99,
+                59.99,
+                None,
+                14.99,
+                9.99,
+                24.99,
+                None,
+                7.99,
+                12.99,
+                19.99,
+                49.99,
+                29.99,
+                79.99,
+                None,
+                39.99,
+            ],
+            "verified_purchase": [
+                True,
+                True,
+                False,
+                True,
+                False,
+                True,
+                True,
+                False,
+                True,
+                False,
+                True,
+                True,
+                False,
+                True,
+                True,
+                True,
+                True,
+                False,
+                True,
+                True,
+            ],
+            "helpful_votes": [
+                10,
+                0,
+                5,
+                2,
+                0,
+                8,
+                15,
+                1,
+                3,
+                0,
+                7,
+                4,
+                0,
+                2,
+                5,
+                0,
+                6,
+                12,
+                0,
+                3,
+            ],
+            "event_time": pd.to_datetime(
+                [
+                    "2022-01-15",
+                    "2022-03-20",
+                    "2021-11-05",
+                    "2022-06-01",
+                    "2020-08-15",
+                    "2022-12-31",
+                    "2023-01-01",
+                    "2021-06-20",
+                    "2022-04-10",
+                    "2021-09-15",
+                    "2022-07-20",
+                    "2020-12-01",
+                    "2023-02-14",
+                    "2022-11-30",
+                    "2021-03-05",
+                    "2022-05-20",
+                    "2021-12-10",
+                    "2022-08-08",
+                    "2020-10-25",
+                    "2023-03-15",
+                ],
+                utc=True,
+            ),
+            "world_id": ["test_world"] * 20,
+        }
+    )
 
 
 @pytest.fixture
@@ -106,6 +190,7 @@ def make_query(family, agg_spec, scope_pred, fields=None):
 # ---------------------------------------------------------------------------
 # Count tests
 # ---------------------------------------------------------------------------
+
 
 def test_count_all(sample_df, parquet_path):
     query = make_query(
@@ -162,6 +247,7 @@ def test_count_empty_scope(sample_df, parquet_path):
 # Mean tests
 # ---------------------------------------------------------------------------
 
+
 def test_mean_rating_electronics(sample_df, parquet_path):
     query = make_query(
         QueryFamily.MEAN,
@@ -171,7 +257,7 @@ def test_mean_rating_electronics(sample_df, parquet_path):
     validator = GoldValidator()
     result = validator.validate(query, sample_df, parquet_path)
     assert result.agreed
-    
+
     # Verify manually
     elec = sample_df[sample_df["category"] == "Electronics"]["rating"]
     expected = round(float(elec.mean()), 4)
@@ -209,19 +295,18 @@ def test_mean_empty_scope(sample_df, parquet_path):
 # Proportion tests
 # ---------------------------------------------------------------------------
 
+
 def test_proportion_verified_electronics(sample_df, parquet_path):
     query = make_query(
         QueryFamily.PROPORTION,
-        ProportionSpec(
-            numerator_predicate=EqPredicate(field="verified_purchase", value=True)
-        ),
+        ProportionSpec(numerator_predicate=EqPredicate(field="verified_purchase", value=True)),
         EqPredicate(field="category", value="Electronics"),
         fields=["record_id", "category", "verified_purchase"],
     )
     validator = GoldValidator()
     result = validator.validate(query, sample_df, parquet_path)
     assert result.agreed
-    
+
     # Manually: Electronics verified / Electronics total
     elec = sample_df[sample_df["category"] == "Electronics"]
     expected = round(elec["verified_purchase"].mean(), 4)
@@ -231,6 +316,7 @@ def test_proportion_verified_electronics(sample_df, parquet_path):
 # ---------------------------------------------------------------------------
 # Comparison tests
 # ---------------------------------------------------------------------------
+
 
 def test_comparison_mean_rating(sample_df, parquet_path):
     query = make_query(
@@ -270,6 +356,7 @@ def test_comparison_count(sample_df, parquet_path):
 # Top-K tests
 # ---------------------------------------------------------------------------
 
+
 def test_topk_brands_by_count(sample_df, parquet_path):
     query = make_query(
         QueryFamily.TOP_K,
@@ -288,8 +375,11 @@ def test_topk_categories_by_mean_rating(sample_df, parquet_path):
     query = make_query(
         QueryFamily.TOP_K,
         TopKSpec(
-            group_by_field="category", measure="mean", value_field="rating",
-            k=2, tie_policy=TiePolicy.FIRST
+            group_by_field="category",
+            measure="mean",
+            value_field="rating",
+            k=2,
+            tie_policy=TiePolicy.FIRST,
         ),
         RangePredicate(field="rating", low=1.0),
         fields=["record_id", "category", "rating"],
@@ -303,6 +393,7 @@ def test_topk_categories_by_mean_rating(sample_df, parquet_path):
 # ---------------------------------------------------------------------------
 # Trend tests
 # ---------------------------------------------------------------------------
+
 
 def test_trend_monthly_count(sample_df, parquet_path):
     query = make_query(
@@ -334,6 +425,7 @@ def test_trend_quarterly_mean_rating(sample_df, parquet_path):
 # Agreement tests
 # ---------------------------------------------------------------------------
 
+
 def test_results_agree_floats():
     assert _results_agree(1.0, 1.0, 1e-6)
     assert _results_agree(1.0, 1.0 + 1e-7, 1e-6)
@@ -354,6 +446,7 @@ def test_results_agree_lists():
 def test_disagreement_detection(sample_df, parquet_path):
     """Injecting a disagreement: manually test that it's caught."""
     from faulttrace_gold.validator import _results_agree
+
     assert not _results_agree(42.0, 43.0, 0.0)
     assert _results_agree(42.0, 42.0 + 1e-8, 1e-6)
 
@@ -361,6 +454,7 @@ def test_disagreement_detection(sample_df, parquet_path):
 # ---------------------------------------------------------------------------
 # Null policy tests
 # ---------------------------------------------------------------------------
+
 
 def test_null_policy_exclude_mean(sample_df, parquet_path):
     """EXCLUDE null policy: nulls should not affect mean."""
@@ -372,10 +466,10 @@ def test_null_policy_exclude_mean(sample_df, parquet_path):
     )
     pd_eval = PandasEvaluator()
     dk_eval = DuckDBEvaluator()
-    
+
     pd_result = pd_eval.evaluate(query, sample_df)
     dk_result = dk_eval.evaluate_from_df(query, sample_df)
-    
+
     assert pd_result["result"] is not None
     assert abs(float(pd_result["result"]) - float(dk_result["result"])) < 1e-3
 
@@ -384,27 +478,32 @@ def test_null_policy_exclude_mean(sample_df, parquet_path):
 # Boundary date tests
 # ---------------------------------------------------------------------------
 
+
 def test_boundary_dates(tmp_path):
     """Records at exact date boundaries should be handled correctly."""
-    boundary_df = pd.DataFrame({
-        "record_id": ["b1", "b2", "b3"],
-        "category": ["Electronics"] * 3,
-        "rating": [4.0, 4.5, 5.0],
-        "brand": ["TechPrime"] * 3,
-        "verified_purchase": [True] * 3,
-        "helpful_votes": [0] * 3,
-        "price": [29.99] * 3,
-        "event_time": pd.to_datetime([
-            "2021-12-31T23:59:59+00:00",
-            "2022-01-01T00:00:00+00:00",
-            "2022-01-01T00:00:01+00:00",
-        ]),
-        "world_id": ["boundary_world"] * 3,
-    })
-    
+    boundary_df = pd.DataFrame(
+        {
+            "record_id": ["b1", "b2", "b3"],
+            "category": ["Electronics"] * 3,
+            "rating": [4.0, 4.5, 5.0],
+            "brand": ["TechPrime"] * 3,
+            "verified_purchase": [True] * 3,
+            "helpful_votes": [0] * 3,
+            "price": [29.99] * 3,
+            "event_time": pd.to_datetime(
+                [
+                    "2021-12-31T23:59:59+00:00",
+                    "2022-01-01T00:00:00+00:00",
+                    "2022-01-01T00:00:01+00:00",
+                ]
+            ),
+            "world_id": ["boundary_world"] * 3,
+        }
+    )
+
     parquet_path = tmp_path / "boundary.parquet"
     boundary_df.to_parquet(parquet_path, index=False)
-    
+
     cutoff = "2022-01-01T00:00:00+00:00"
     query = make_query(
         QueryFamily.COUNT,
@@ -413,7 +512,7 @@ def test_boundary_dates(tmp_path):
         fields=["record_id", "event_time"],
     )
     query = query.model_copy(update={"world_id": "boundary_world"})
-    
+
     validator = GoldValidator()
     result = validator.validate(query, boundary_df, parquet_path)
     assert result.agreed

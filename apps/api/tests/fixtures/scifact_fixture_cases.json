@@ -1,0 +1,57 @@
+[
+  {
+    "case_id": "scifact_supported_001",
+    "dataset_id": "scifact",
+    "query_id": "1",
+    "query_text": "0-dimensional biomaterials show inductive properties.",
+    "doc_id": "4983",
+    "doc_text": "0-dimensional biomaterials such as quantum dots have been shown to exhibit inductive properties that stimulate tissue regeneration. Their nanoscale size enables unique interactions with biological systems that promote cellular differentiation.",
+    "gold_support_status": "supported",
+    "expected_dominant_fault": "none",
+    "description": "Document clearly supports the claim with matching terminology and evidence"
+  },
+  {
+    "case_id": "scifact_refuted_001",
+    "dataset_id": "scifact",
+    "query_id": "2",
+    "query_text": "Antiretroviral therapy increases risk of HIV-associated lipodystrophy.",
+    "doc_id": "5001",
+    "doc_text": "Recent meta-analyses indicate that newer antiretroviral regimens significantly reduce the incidence of HIV-associated lipodystrophy compared to older HAART protocols. The risk of metabolic complications has decreased substantially.",
+    "gold_support_status": "unsupported",
+    "expected_dominant_fault": "none",
+    "description": "Document explicitly refutes the claim — newer ARVs reduce lipodystrophy risk"
+  },
+  {
+    "case_id": "scifact_insufficient_001",
+    "dataset_id": "scifact",
+    "query_id": "3",
+    "query_text": "CRISPR-Cas9 has achieved 100% efficiency in all human cell types tested.",
+    "doc_id": "5042",
+    "doc_text": "The general biology of the cardiovascular system involves multiple regulatory mechanisms. Blood pressure regulation depends on cardiac output and peripheral vascular resistance.",
+    "gold_support_status": "insufficient_evidence",
+    "expected_dominant_fault": "retrieval",
+    "description": "Document is completely off-topic — retrieval failure"
+  },
+  {
+    "case_id": "scifact_partial_001",
+    "dataset_id": "scifact",
+    "query_id": "4",
+    "query_text": "mRNA vaccines produce long-lasting immunity against SARS-CoV-2.",
+    "doc_id": "5103",
+    "doc_text": "Studies have shown that mRNA vaccines against SARS-CoV-2 generate robust immune responses in most individuals. However, immunity waning has been observed after 6 months, requiring booster doses. The durability of protection varies significantly by age and prior exposure.",
+    "gold_support_status": "partially_supported",
+    "expected_dominant_fault": "none",
+    "description": "Document partially supports — confirms efficacy but contradicts 'long-lasting' duration"
+  },
+  {
+    "case_id": "scifact_conflicting_001",
+    "dataset_id": "scifact",
+    "query_id": "5",
+    "query_text": "Aspirin reduces all-cause mortality in healthy adults over 70.",
+    "doc_id": "5207",
+    "doc_text": "Trial A found that aspirin reduced cardiovascular events in adults over 70. Trial B found that aspirin increased bleeding risk and did not reduce all-cause mortality in the same population. The results are contradictory across patient subgroups.",
+    "gold_support_status": "conflicting",
+    "expected_dominant_fault": "none",
+    "description": "Document itself contains conflicting evidence from different trials"
+  }
+]

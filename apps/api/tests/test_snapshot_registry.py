@@ -5,7 +5,6 @@ Tests for the SnapshotRegistry and DatasetSnapshot (WP3).
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -13,12 +12,14 @@ import pytest
 @pytest.fixture
 def registry(tmp_path):
     from faulttrace_data.snapshot import SnapshotRegistry
+
     return SnapshotRegistry(tmp_path / "snapshots.jsonl")
 
 
 @pytest.fixture
 def sample_snapshot():
-    from faulttrace_data.snapshot import DatasetSnapshot, MissingnessSummary, _fingerprint_path
+    from faulttrace_data.snapshot import DatasetSnapshot
+
     return DatasetSnapshot(
         snapshot_id="snap_test_001",
         dataset_id="test_dataset",
@@ -46,6 +47,7 @@ class TestSnapshotRegistry:
         registry.register(sample_snapshot)
 
         from faulttrace_data.snapshot import DatasetSnapshot
+
         other = DatasetSnapshot(
             snapshot_id="snap_other_001",
             dataset_id="other_dataset",
@@ -123,6 +125,7 @@ class TestDatasetSnapshot:
 
     def test_make_snapshot_id_deterministic(self):
         from faulttrace_data.snapshot import DatasetSnapshot
+
         sid1 = DatasetSnapshot.make_snapshot_id("ds1", "a" * 64, "b" * 64)
         sid2 = DatasetSnapshot.make_snapshot_id("ds1", "a" * 64, "b" * 64)
         assert sid1 == sid2
@@ -130,12 +133,14 @@ class TestDatasetSnapshot:
 
     def test_snapshot_id_differs_by_dataset(self):
         from faulttrace_data.snapshot import DatasetSnapshot
+
         sid1 = DatasetSnapshot.make_snapshot_id("ds1", "a" * 64, "b" * 64)
         sid2 = DatasetSnapshot.make_snapshot_id("ds2", "a" * 64, "b" * 64)
         assert sid1 != sid2
 
     def test_schema_version_present(self, sample_snapshot):
         from faulttrace_data.snapshot import SNAPSHOT_SCHEMA_VERSION
+
         assert sample_snapshot.schema_version == SNAPSHOT_SCHEMA_VERSION
 
     def test_missingness_summary_defaults(self, sample_snapshot):
@@ -145,6 +150,7 @@ class TestDatasetSnapshot:
     def test_model_dump_json_roundtrip(self, sample_snapshot):
         dumped = sample_snapshot.model_dump_json()
         from faulttrace_data.snapshot import DatasetSnapshot
+
         reloaded = DatasetSnapshot.model_validate_json(dumped)
         assert reloaded.snapshot_id == sample_snapshot.snapshot_id
         assert reloaded.row_count == sample_snapshot.row_count
@@ -153,6 +159,7 @@ class TestDatasetSnapshot:
 class TestPathFingerprinting:
     def test_fingerprint_no_absolute_path(self, tmp_path):
         from faulttrace_data.snapshot import _fingerprint_path
+
         data_root = tmp_path / "data"
         data_root.mkdir()
         source = data_root / "raw" / "reviews.jsonl"
@@ -163,6 +170,7 @@ class TestPathFingerprinting:
 
     def test_fingerprint_same_relative_same_hash(self, tmp_path):
         from faulttrace_data.snapshot import _fingerprint_path
+
         data_root = tmp_path / "data"
         data_root.mkdir()
         source1 = data_root / "raw" / "reviews.jsonl"
@@ -171,6 +179,7 @@ class TestPathFingerprinting:
 
     def test_fingerprint_different_paths_different_hash(self, tmp_path):
         from faulttrace_data.snapshot import _fingerprint_path
+
         data_root = tmp_path / "data"
         data_root.mkdir()
         source1 = data_root / "reviews_v1.jsonl"

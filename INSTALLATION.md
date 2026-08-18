@@ -1,8 +1,8 @@
 # Installation Guide
 
 ## Requirements
-- Python 3.10+
-- Node.js 18+
+- Python 3.11+
+- Node.js 20+
 
 ## Quick Start
 ```bash

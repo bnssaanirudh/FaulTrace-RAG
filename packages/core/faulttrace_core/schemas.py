@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from faulttrace_core.models import (
-    AggregationSpec,
+    SCHEMA_VERSION,
     ComponentOutput,
     CorpusRecord,
     CorpusWorld,
@@ -21,9 +21,7 @@ from faulttrace_core.models import (
     PipelineRun,
     QuerySpec,
     TraceEvent,
-    SCHEMA_VERSION,
 )
-
 
 EXPORTABLE_MODELS = {
     "CorpusRecord": CorpusRecord,

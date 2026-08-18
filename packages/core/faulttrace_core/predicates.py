@@ -8,8 +8,8 @@ All transformations are explicit case-by-case implementations.
 from __future__ import annotations
 
 import re
-from datetime import datetime, date
-from typing import Any, TYPE_CHECKING
+from datetime import date, datetime
+from typing import Any
 
 import pandas as pd
 
@@ -27,44 +27,46 @@ from faulttrace_core.models import (
 )
 
 # Safe field name pattern: alphanumeric + underscore only
-_SAFE_FIELD_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+_SAFE_FIELD_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 # Fields allowed in predicates
-ALLOWED_FIELDS: frozenset[str] = frozenset({
-    "record_id",
-    "source",
-    "world_id",
-    "product_id",
-    "parent_id",
-    "category",
-    "title",
-    "brand",
-    "rating",
-    "helpful_votes",
-    "verified_purchase",
-    "event_time",
-    "price",
-    "text",
-    "schema_version",
-    # EDGAR fields
-    "cik",
-    "accession_number",
-    "filing_date",
-    "form_type",
-    "fiscal_year",
-    "fiscal_period",
-    "tag",
-    "namespace",
-    "unit",
-    "value",
-    "decimals",
-    "start_date",
-    "end_date",
-    "segment_id",
-    "source_url",
-    "raw_payload_hash",
-    "canonical_fact_hash",
-})
+ALLOWED_FIELDS: frozenset[str] = frozenset(
+    {
+        "record_id",
+        "source",
+        "world_id",
+        "product_id",
+        "parent_id",
+        "category",
+        "title",
+        "brand",
+        "rating",
+        "helpful_votes",
+        "verified_purchase",
+        "event_time",
+        "price",
+        "text",
+        "schema_version",
+        # EDGAR fields
+        "cik",
+        "accession_number",
+        "filing_date",
+        "form_type",
+        "fiscal_year",
+        "fiscal_period",
+        "tag",
+        "namespace",
+        "unit",
+        "value",
+        "decimals",
+        "start_date",
+        "end_date",
+        "segment_id",
+        "source_url",
+        "raw_payload_hash",
+        "canonical_fact_hash",
+    }
+)
 
 
 def _validate_field_name(field: str) -> str:
@@ -100,7 +102,7 @@ def _sql_literals(values: list[Any]) -> str:
 class PredicateCompiler:
     """
     Compiles ScopePredicate AST to Pandas masks and DuckDB SQL WHERE clauses.
-    
+
     Usage:
         compiler = PredicateCompiler()
         mask = compiler.to_pandas_mask(predicate, df)
@@ -176,15 +178,9 @@ class PredicateCompiler:
         col = df[field]
         mask = pd.Series([True] * len(df), index=df.index)
         if pred.low is not None:
-            if pred.low_inclusive:
-                mask = mask & (col >= pred.low)
-            else:
-                mask = mask & (col > pred.low)
+            mask = mask & (col >= pred.low) if pred.low_inclusive else mask & (col > pred.low)
         if pred.high is not None:
-            if pred.high_inclusive:
-                mask = mask & (col <= pred.high)
-            else:
-                mask = mask & (col < pred.high)
+            mask = mask & (col <= pred.high) if pred.high_inclusive else mask & (col < pred.high)
         return mask
 
     # --- SQL compilation ---

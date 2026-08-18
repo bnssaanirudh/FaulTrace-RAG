@@ -7,11 +7,9 @@ structured logging, CORS, pagination, and error models.
 
 from __future__ import annotations
 
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Any
 
 import structlog
 from fastapi import FastAPI, Request, Response
@@ -42,7 +40,8 @@ def create_app() -> FastAPI:
         description=(
             "Counterfactual Fault Localization for Corpus-Level LLM Analytics Pipelines. "
             "Provides deterministic corpus data, procedural queries, dual gold evaluation, "
-            "and traced pipeline execution."
+            "traced pipeline execution, evidence-grounded extraction with citation integrity, "
+            "and provenance knowledge graph construction."
         ),
         version="0.1.0",
         docs_url="/docs",
@@ -52,7 +51,9 @@ def create_app() -> FastAPI:
     )
 
     # CORS
-    origins = settings.cors_origins.split(",") if settings.cors_origins else ["http://localhost:3000"]
+    origins = (
+        settings.cors_origins.split(",") if settings.cors_origins else ["http://localhost:3000"]
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=origins,
@@ -71,13 +72,13 @@ def create_app() -> FastAPI:
         duration_ms = (time.monotonic() - start) * 1000
         response.headers["X-Request-ID"] = request_id
         response.headers["X-Duration-MS"] = f"{duration_ms:.1f}"
-        
+
         # Security headers
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = "default-src 'self'"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-        
+
         return response
 
     from starlette.exceptions import HTTPException as StarletteHTTPException
@@ -107,8 +108,26 @@ def create_app() -> FastAPI:
         )
 
     # Include routers
-    from faulttrace_api.routes import health, system, worlds, queries, gold, runs, demo, artifacts
-    from faulttrace_api.routes import datasets, query_packs, disagreements, providers, policies, experiments, annotations, governance
+    from faulttrace_api.routes import (
+        analytics,
+        annotations,
+        artifacts,
+        datasets,
+        demo,
+        disagreements,
+        experiments,
+        gold,
+        governance,
+        health,
+        policies,
+        providers,
+        queries,
+        query_packs,
+        retrieval,
+        runs,
+        system,
+        worlds,
+    )
 
     app.include_router(health.router, prefix="/api/v1", tags=["Health"])
     app.include_router(system.router, prefix="/api/v1", tags=["System"])
@@ -127,6 +146,13 @@ def create_app() -> FastAPI:
     app.include_router(experiments.router, prefix="/api/v1", tags=["Experiments"])
     app.include_router(annotations.router, prefix="/api/v1", tags=["Annotations"])
     app.include_router(governance.router, prefix="/api/v1", tags=["Governance"])
+    # Prompt 3: Real retrieval and analytics
+    app.include_router(retrieval.router, prefix="/api/v1/retrieval", tags=["retrieval"])
+    app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["analytics"])
+    # Prompt 4: Evidence extraction, citation integrity, provenance graph
+    from faulttrace_api.routes import evidence
+
+    app.include_router(evidence.router, prefix="/api/v1/evidence", tags=["evidence"])
 
     return app
 

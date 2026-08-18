@@ -5,7 +5,7 @@ Dataset snapshot REST API endpoints — Prompt 2 (WP8).
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 
@@ -16,6 +16,7 @@ router = APIRouter()
 
 def _get_registry():
     from faulttrace_data.snapshot import SnapshotRegistry
+
     settings = get_settings()
     registry_path = settings.data_root / "manifests" / "snapshots.jsonl"
     return SnapshotRegistry(registry_path)
@@ -23,7 +24,7 @@ def _get_registry():
 
 @router.get("/datasets", summary="List all ingested dataset snapshots")
 async def list_datasets(
-    dataset_id: Optional[str] = Query(None, description="Filter by dataset ID"),
+    dataset_id: str | None = Query(None, description="Filter by dataset ID"),
     active_only: bool = Query(True, description="Only return active snapshots"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=500),
@@ -31,12 +32,12 @@ async def list_datasets(
     try:
         registry = _get_registry()
         snapshots = registry.list_snapshots(dataset_id=dataset_id, active_only=active_only)
-        
+
         total = len(snapshots)
         start = (page - 1) * page_size
         end = start + page_size
         page_snapshots = snapshots[start:end]
-        
+
         return {
             "items": [
                 {
@@ -51,7 +52,9 @@ async def list_datasets(
                     "active": s.active,
                     "created_at": s.created_at,
                     "license_note": s.license_note,
-                    "canonical_content_hash": s.canonical_content_hash[:16] if s.canonical_content_hash else "",
+                    "canonical_content_hash": s.canonical_content_hash[:16]
+                    if s.canonical_content_hash
+                    else "",
                 }
                 for s in page_snapshots
             ],
@@ -59,7 +62,7 @@ async def list_datasets(
             "page": page,
             "page_size": page_size,
             "has_next": end < total,
-            "count": len(page_snapshots), # For backwards compatibility
+            "count": len(page_snapshots),  # For backwards compatibility
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -125,48 +128,56 @@ async def get_missingness(snapshot_id: str) -> dict[str, Any]:
 
 from pydantic import BaseModel
 
+
 class IngestRequest(BaseModel):
     input_path: str
     dataset_id: str
     license_note: str = ""
     max_bytes_mb: int = 500
 
+
 @router.post("/datasets/ingest", summary="Ingest a local Amazon-style file as a snapshot")
 async def ingest_dataset(request: IngestRequest) -> dict[str, Any]:
     from faulttrace_data.amazon_adapter import AmazonLocalAdapter
     from faulttrace_data.snapshot import SnapshotRegistry
-    
+
     settings = get_settings()
     input_path = Path(request.input_path)
-    
+
     # SECURITY: Path traversal protection
     try:
-        resolved_path = input_path.resolve()
-        if not str(resolved_path).startswith(str(settings.data_root.resolve())) and not "fixtures" in str(resolved_path):
-            pass # We allow fixtures or data_root for now, but strictly we should check.
+        resolved_path = input_path.resolve(strict=True)
+        if not str(resolved_path).startswith(
+            str(settings.data_root.resolve())
+        ) and "fixtures" not in str(resolved_path):
+            raise HTTPException(
+                status_code=400, detail="Path traversal detected: outside trusted roots"
+            )
+    except HTTPException:
+        raise
     except Exception:
-        raise HTTPException(status_code=400, detail="Invalid path")
-        
+        raise HTTPException(status_code=400, detail="Invalid or non-existent path")
+
     if ".." in request.input_path:
         raise HTTPException(status_code=400, detail="Path traversal detected")
-        
+
     # SECURITY: Extension / MIME check (simple)
     if not (input_path.name.endswith(".json") or input_path.name.endswith(".jsonl")):
         raise HTTPException(status_code=400, detail="Only .json or .jsonl files are allowed")
 
     if not input_path.exists():
         raise HTTPException(status_code=404, detail=f"Input file not found: {input_path}")
-        
+
     output = settings.data_root / "snapshots"
     data_root = settings.data_root
-    
+
     adapter = AmazonLocalAdapter(
         dataset_id=request.dataset_id,
         max_bytes=request.max_bytes_mb * 1024 * 1024,
     )
-    
+
     producing_cmd = f"api: POST /api/v1/datasets/ingest --input {input_path.name}"
-    
+
     try:
         report, snapshot = adapter.ingest(
             source_path=input_path,
@@ -185,5 +196,169 @@ async def ingest_dataset(request: IngestRequest) -> dict[str, Any]:
             "accepted_count": report.accepted_count,
             "rejected_count": report.rejected_count,
         }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Text Corpus Endpoints
+# ---------------------------------------------------------------------------
+
+
+class TextIngestRequest(BaseModel):
+    input_path: str
+    dataset_id: str
+    source_type: str
+    license_note: str = ""
+    chunk_size: int = 1000
+    overlap: int = 100
+    strict_chunk_dedup: bool = False
+    text_field: str = "text"
+    id_field: str = "id"
+    title_field: str = "title"
+
+
+def _get_text_registry():
+    from faulttrace_data.text.snapshot_text import TextSnapshotRegistry
+
+    settings = get_settings()
+    registry_path = settings.data_root / "manifests" / "text_snapshots.jsonl"
+    return TextSnapshotRegistry(registry_path)
+
+
+@router.post("/datasets/text/ingest", summary="Ingest a text corpus")
+async def ingest_text_dataset(request: TextIngestRequest) -> dict[str, Any]:
+    from faulttrace_data.text.pipeline import TextIngestionPipeline
+
+    settings = get_settings()
+    input_path = Path(request.input_path)
+
+    # SECURITY: Path traversal protection
+    try:
+        resolved_path = input_path.resolve(strict=True)
+        if not str(resolved_path).startswith(
+            str(settings.data_root.resolve())
+        ) and "fixtures" not in str(resolved_path):
+            raise HTTPException(
+                status_code=400, detail="Path traversal detected: outside trusted roots"
+            )
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid or non-existent path")
+
+    if ".." in request.input_path:
+        raise HTTPException(status_code=400, detail="Path traversal detected")
+
+    if not input_path.exists():
+        raise HTTPException(status_code=404, detail=f"Input file/directory not found: {input_path}")
+
+    registry_path = settings.data_root / "manifests" / "text_snapshots.jsonl"
+    pipeline = TextIngestionPipeline(data_root=settings.data_root, registry_path=registry_path)
+
+    try:
+        snapshot = pipeline.run(
+            dataset_id=request.dataset_id,
+            source_path=resolved_path,
+            source_type=request.source_type,
+            config={
+                "chunk_size": request.chunk_size,
+                "overlap": request.overlap,
+                "strict_chunk_dedup": request.strict_chunk_dedup,
+                "text_field": request.text_field,
+                "id_field": request.id_field,
+                "title_field": request.title_field,
+            },
+        )
+        return {
+            "status": "success",
+            "snapshot_id": snapshot.snapshot_id,
+            "document_count": snapshot.document_count,
+            "chunk_count": snapshot.chunk_count,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/datasets/text", summary="List all ingested text dataset snapshots")
+async def list_text_datasets(
+    dataset_id: str | None = Query(None, description="Filter by dataset ID"),
+    active_only: bool = Query(True, description="Only return active snapshots"),
+) -> dict[str, Any]:
+    try:
+        registry = _get_text_registry()
+        snapshots = registry.list_snapshots(dataset_id=dataset_id, active_only=active_only)
+
+        return {
+            "items": [
+                {
+                    "snapshot_id": s.snapshot_id,
+                    "dataset_id": s.dataset_id,
+                    "source_type": s.source_type,
+                    "document_count": s.document_count,
+                    "chunk_count": s.chunk_count,
+                    "active": s.active,
+                    "created_at": s.created_at,
+                }
+                for s in snapshots
+            ],
+            "total": len(snapshots),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/datasets/text/{snapshot_id}", summary="Get a specific text snapshot by ID")
+async def get_text_snapshot(snapshot_id: str) -> dict[str, Any]:
+    try:
+        registry = _get_text_registry()
+        snapshot = registry.inspect(snapshot_id)
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail=f"Text snapshot '{snapshot_id}' not found")
+        return snapshot.model_dump()
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/datasets/text/{snapshot_id}/preview", summary="Preview chunks of a text snapshot")
+async def preview_text_snapshot(
+    snapshot_id: str, page: int = Query(1, ge=1), page_size: int = Query(10, ge=1, le=100)
+) -> dict[str, Any]:
+    import pandas as pd
+
+    try:
+        registry = _get_text_registry()
+        snapshot = registry.inspect(snapshot_id)
+        if snapshot is None:
+            raise HTTPException(status_code=404, detail=f"Text snapshot '{snapshot_id}' not found")
+
+        settings = get_settings()
+        parquet_path = settings.data_root / snapshot.parquet_root / "chunks.parquet"
+
+        if not parquet_path.exists():
+            raise HTTPException(status_code=404, detail="Parquet chunks not found for snapshot")
+
+        # We read the parquet file to get the preview.
+        # This is safe because we only read from generated parquet files and never arbitrary files.
+        df = pd.read_parquet(parquet_path)
+
+        total = len(df)
+        start = (page - 1) * page_size
+        end = min(start + page_size, total)
+
+        preview_df = df.iloc[start:end]
+        chunks = preview_df.to_dict(orient="records")
+
+        return {
+            "snapshot_id": snapshot_id,
+            "total_chunks": total,
+            "page": page,
+            "page_size": page_size,
+            "chunks": chunks,
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

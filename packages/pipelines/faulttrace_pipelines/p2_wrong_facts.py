@@ -19,18 +19,17 @@ from __future__ import annotations
 import random
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
-
 from faulttrace_core.models import (
-    ComponentOutput,
     GoldAnswer,
     QuerySpec,
     TraceEventType,
 )
 from faulttrace_core.predicates import compiler
 from faulttrace_gold.pandas_engine import PandasEvaluator
+
 from faulttrace_pipelines.base import AbstractPipeline
 
 PIPELINE_ID = "P2-wrong-facts"
@@ -39,8 +38,16 @@ PROVIDER_ID = "fault-injection"
 _eval = PandasEvaluator()
 
 _CATEGORY_POOL = [
-    "Electronics", "Books", "Sports", "Clothing", "Home & Kitchen",
-    "Automotive", "Health", "Office Products", "Toys", "Garden",
+    "Electronics",
+    "Books",
+    "Sports",
+    "Clothing",
+    "Home & Kitchen",
+    "Automotive",
+    "Health",
+    "Office Products",
+    "Toys",
+    "Garden",
 ]
 _BRAND_POOL = ["TechPrime", "VoltEdge", "BookCo", "SportPeak", "FitCore", "OfficePro", "HomePlus"]
 
@@ -73,19 +80,23 @@ def _corrupt_dataframe(df: pd.DataFrame, fields: list[str], rng: random.Random) 
 
         elif pd.api.types.is_bool_dtype(dtype) or col.isin([True, False]).all():
             # 30% bit-flip on boolean fields
-            df[field] = col.apply(
-                lambda v: (not v) if rng.random() < 0.30 else v
-            )
+            df[field] = col.apply(lambda v: (not v) if rng.random() < 0.30 else v)
 
         elif pd.api.types.is_object_dtype(dtype) or pd.api.types.is_string_dtype(dtype):
             # Replace 20% of string values with plausible wrong value
             if field == "category":
                 df[field] = col.apply(
-                    lambda v: rng.choice([c for c in _CATEGORY_POOL if c != v]) if rng.random() < 0.20 else v
+                    lambda v: (
+                        rng.choice([c for c in _CATEGORY_POOL if c != v])
+                        if rng.random() < 0.20
+                        else v
+                    )
                 )
             elif field == "brand":
                 df[field] = col.apply(
-                    lambda v: rng.choice([b for b in _BRAND_POOL if b != v]) if rng.random() < 0.20 else v
+                    lambda v: (
+                        rng.choice([b for b in _BRAND_POOL if b != v]) if rng.random() < 0.20 else v
+                    )
                 )
 
     return df
@@ -107,18 +118,22 @@ class P2WrongFacts(AbstractPipeline):
         run_id: str,
         query: QuerySpec,
         df: pd.DataFrame,
-        parquet_path: Optional[Path],
-        gold_answer: Optional[GoldAnswer],
+        parquet_path: Path | None,
+        gold_answer: GoldAnswer | None,
     ) -> tuple[Any, list, list, int, int]:
         events: list = []
         components: list = []
 
         # ── Stage 1: query_load ──
-        events.append(self._make_event(
-            run_id, "query_load", TraceEventType.QUERY_LOAD,
-            f"P2 loaded query {query.query_id} family={query.family.value}",
-            payload={"pipeline": self.pipeline_id, "fault": "wrong_facts"},
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "query_load",
+                TraceEventType.QUERY_LOAD,
+                f"P2 loaded query {query.query_id} family={query.family.value}",
+                payload={"pipeline": self.pipeline_id, "fault": "wrong_facts"},
+            )
+        )
 
         # ── Stage 2: scope_enumerate (correct) ──
         t1 = time.perf_counter()
@@ -126,18 +141,22 @@ class P2WrongFacts(AbstractPipeline):
         scope_df = df[mask].copy()
         scope_duration = (time.perf_counter() - t1) * 1000
 
-        events.append(self._make_event(
-            run_id, "scope_enumerate", TraceEventType.SCOPE_ENUMERATE,
-            f"Correct scope: {len(scope_df)} records",
-            record_count_in=len(df),
-            record_count_out=len(scope_df),
-            duration_ms=scope_duration,
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "scope_enumerate",
+                TraceEventType.SCOPE_ENUMERATE,
+                f"Correct scope: {len(scope_df)} records",
+                record_count_in=len(df),
+                record_count_out=len(scope_df),
+                duration_ms=scope_duration,
+            )
+        )
 
         scope_path = self.artifacts_dir / run_id / "scope_output.parquet"
         scope_path.parent.mkdir(parents=True, exist_ok=True)
         scope_df.to_parquet(scope_path, index=False)
-        
+
         # ── Stage 3: fact_extract (FAULTY — adds noise) ──
         t2 = time.perf_counter()
         rng = random.Random(str(query.query_id))
@@ -147,22 +166,26 @@ class P2WrongFacts(AbstractPipeline):
         corrupted_df = _corrupt_dataframe(raw_extraction, avail, rng)
         extract_duration = (time.perf_counter() - t2) * 1000
 
-        events.append(self._make_event(
-            run_id, "fact_extract", TraceEventType.FACT_EXTRACT,
-            f"P2 FAULT: field noise injected into {len(avail)} fields across {len(corrupted_df)} records",
-            record_count_in=len(scope_df),
-            record_count_out=len(corrupted_df),
-            duration_ms=extract_duration,
-            payload={
-                "fault_type": "wrong_facts",
-                "corrupted_fields": avail,
-                "noise_model": "gaussian_10pct + categorical_20pct_swap",
-            },
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "fact_extract",
+                TraceEventType.FACT_EXTRACT,
+                f"P2 FAULT: field noise injected into {len(avail)} fields across {len(corrupted_df)} records",
+                record_count_in=len(scope_df),
+                record_count_out=len(corrupted_df),
+                duration_ms=extract_duration,
+                payload={
+                    "fault_type": "wrong_facts",
+                    "corrupted_fields": avail,
+                    "noise_model": "gaussian_10pct + categorical_20pct_swap",
+                },
+            )
+        )
 
         extract_path = self.artifacts_dir / run_id / "extraction.parquet"
         corrupted_df.to_parquet(extract_path, index=False)
-        
+
         # ── Stage 4: aggregate (correct oracle on corrupted data) ──
         t3 = time.perf_counter()
         # Re-join corrupted fields back into full df for evaluation
@@ -175,20 +198,32 @@ class P2WrongFacts(AbstractPipeline):
         answer_value = agg_result.get("result")
         agg_duration = (time.perf_counter() - t3) * 1000
 
-        events.append(self._make_event(
-            run_id, "aggregate", TraceEventType.AGGREGATE,
-            f"Aggregation on corrupted facts → {answer_value}",
-            duration_ms=agg_duration,
-            payload={"answer": str(answer_value), "fault_layer": "facts"},
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "aggregate",
+                TraceEventType.AGGREGATE,
+                f"Aggregation on corrupted facts → {answer_value}",
+                duration_ms=agg_duration,
+                payload={"answer": str(answer_value), "fault_layer": "facts"},
+            )
+        )
 
-        events.append(self._make_event(
-            run_id, "validate", TraceEventType.VALIDATE,
-            f"Gold: {gold_answer.answer_value if gold_answer else '?'} vs pipeline: {answer_value}",
-        ))
-        events.append(self._make_event(
-            run_id, "persist", TraceEventType.PERSIST,
-            "P2 run artifacts persisted",
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "validate",
+                TraceEventType.VALIDATE,
+                f"Gold: {gold_answer.answer_value if gold_answer else '?'} vs pipeline: {answer_value}",
+            )
+        )
+        events.append(
+            self._make_event(
+                run_id,
+                "persist",
+                TraceEventType.PERSIST,
+                "P2 run artifacts persisted",
+            )
+        )
 
         return answer_value, events, components, 0, 0

@@ -1,11 +1,11 @@
 import json
-import os
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+from typing import Any
+
+from faulttrace_core.llm import ModelOutput
+from faulttrace_core.models import _stable_hash, _utcnow
 from pydantic import BaseModel, Field
 
-from faulttrace_core.models import _stable_hash, _utcnow
-from faulttrace_core.llm import ModelOutput
 
 class CacheEntry(BaseModel):
     cache_key: str
@@ -13,14 +13,15 @@ class CacheEntry(BaseModel):
     model_id: str
     schema_version: str
     is_success: bool
-    parsed_json: Optional[Dict[str, Any]] = None
+    parsed_json: dict[str, Any] | None = None
     raw_response: str = ""
-    rejected_reason: Optional[str] = None
+    rejected_reason: str | None = None
     latency_ms: float = 0.0
     prompt_tokens: int = 0
     completion_tokens: int = 0
     created_at: str = Field(default_factory=lambda: _utcnow().isoformat())
     software_version: str = "1.0.0"
+
 
 class ExtractionCache:
     """
@@ -28,8 +29,8 @@ class ExtractionCache:
     A disk-based cache for extraction units. Keyed by the fingerprint of model,
     prompt, schema, records, and repair attempt.
     """
-    
-    def __init__(self, cache_dir: Optional[Path] = None):
+
+    def __init__(self, cache_dir: Path | None = None):
         if cache_dir is None:
             # Default to a global cache dir so resuming across runs works
             self.cache_dir = Path("data/cache/extraction")
@@ -44,7 +45,7 @@ class ExtractionCache:
         prompt_hash: str,
         records_hash: str,
         schema_hash: str,
-        repair_attempt: int
+        repair_attempt: int,
     ) -> str:
         data = {
             "provider": provider_name,
@@ -52,7 +53,7 @@ class ExtractionCache:
             "prompt_hash": prompt_hash,
             "records_hash": records_hash,
             "schema_hash": schema_hash,
-            "repair_attempt": repair_attempt
+            "repair_attempt": repair_attempt,
         }
         return _stable_hash(data)
 
@@ -61,11 +62,11 @@ class ExtractionCache:
         subdir = cache_key[:2]
         return self.cache_dir / subdir / f"{cache_key}.json"
 
-    def get(self, cache_key: str) -> Optional[CacheEntry]:
+    def get(self, cache_key: str) -> CacheEntry | None:
         path = self._get_path(cache_key)
         if path.exists():
             try:
-                with open(path, "r", encoding="utf-8") as f:
+                with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                     return CacheEntry.model_validate(data)
             except Exception:
@@ -79,14 +80,10 @@ class ExtractionCache:
             f.write(entry.model_dump_json())
 
     def store_output(
-        self,
-        cache_key: str,
-        output: ModelOutput,
-        schema_version: str,
-        latency_ms: float
+        self, cache_key: str, output: ModelOutput, schema_version: str, latency_ms: float
     ) -> CacheEntry:
         is_success = output.parsed_json is not None
-        
+
         entry = CacheEntry(
             cache_key=cache_key,
             provider_name=output.provider_name or "unknown",
@@ -98,7 +95,7 @@ class ExtractionCache:
             rejected_reason=output.rejected_reason,
             latency_ms=latency_ms,
             prompt_tokens=output.prompt_tokens,
-            completion_tokens=output.completion_tokens
+            completion_tokens=output.completion_tokens,
         )
         self.put(entry)
         return entry

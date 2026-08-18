@@ -1,0 +1,45 @@
+[
+  {
+    "case_id": "hotpotqa_multihop_correct_001",
+    "dataset_id": "hotpotqa",
+    "query_id": "hp001",
+    "query_text": "What is the nationality of the founder of the company that makes the iPhone?",
+    "doc_ids": ["hp_doc_001", "hp_doc_002"],
+    "docs": {
+      "hp_doc_001": "The iPhone is manufactured and sold by Apple Inc., a technology company founded in 1976. Apple was co-founded by Steve Jobs, Steve Wozniak, and Ronald Wayne.",
+      "hp_doc_002": "Steve Jobs was born on February 24, 1955, in San Francisco, California. He was an American business magnate and technology visionary."
+    },
+    "gold_support_status": "supported",
+    "expected_answer": "American",
+    "hop_chain": ["Apple makes iPhone", "Steve Jobs founded Apple", "Steve Jobs was American"],
+    "description": "Correct two-hop reasoning chain"
+  },
+  {
+    "case_id": "hotpotqa_missing_hop_001",
+    "dataset_id": "hotpotqa",
+    "query_id": "hp002",
+    "query_text": "In what city was the composer of the 1812 Overture born?",
+    "doc_ids": ["hp_doc_003"],
+    "docs": {
+      "hp_doc_003": "The 1812 Overture is a famous orchestral work that celebrates the Russian victory over Napoleon. It was composed in 1880 and premiered to great acclaim."
+    },
+    "gold_support_status": "insufficient_evidence",
+    "expected_answer": null,
+    "missing_hop": "Composer identity (Tchaikovsky) not mentioned in retrieved documents",
+    "expected_dominant_fault": "retrieval",
+    "description": "Missing hop — retrieval failed to include Tchaikovsky biography document"
+  },
+  {
+    "case_id": "hotpotqa_wrong_supporting_fact_001",
+    "dataset_id": "hotpotqa",
+    "query_id": "hp003",
+    "query_text": "What country is home to the tallest building in the world?",
+    "doc_ids": ["hp_doc_004"],
+    "docs": {
+      "hp_doc_004": "The Burj Khalifa in Dubai is a supertall skyscraper completed in 2010. At 828 meters tall, it is the tallest building ever constructed. Dubai is a city in the United Arab Emirates."
+    },
+    "gold_support_status": "supported",
+    "expected_answer": "United Arab Emirates",
+    "description": "Single-hop that requires extracting the correct entity (UAE not Dubai)"
+  }
+]

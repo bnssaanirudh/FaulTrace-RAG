@@ -18,28 +18,25 @@ Recoverable-error attribution: REF(R) = |gold - pipeline_answer| / |gold|
 
 from __future__ import annotations
 
+import contextlib
 import random
-from pathlib import Path
-from typing import Any, Optional
-from uuid import uuid4
 import time
+from pathlib import Path
+from typing import Any
 
 import pandas as pd
-
 from faulttrace_core.models import (
     AndPredicate,
-    ComponentOutput,
     EqPredicate,
     GoldAnswer,
     InPredicate,
-    IsNotNullPredicate,
-    IsNullPredicate,
     QuerySpec,
     RangePredicate,
     TraceEventType,
 )
 from faulttrace_core.predicates import compiler
 from faulttrace_gold.pandas_engine import PandasEvaluator
+
 from faulttrace_pipelines.base import AbstractPipeline
 
 PIPELINE_ID = "P1-wrong-scope"
@@ -49,8 +46,16 @@ _eval = PandasEvaluator()
 
 # Categories available for scope perturbation
 _CATEGORIES = [
-    "Electronics", "Books", "Sports", "Clothing", "Home & Kitchen",
-    "Automotive", "Health", "Office Products", "Toys", "Garden",
+    "Electronics",
+    "Books",
+    "Sports",
+    "Clothing",
+    "Home & Kitchen",
+    "Automotive",
+    "Health",
+    "Office Products",
+    "Toys",
+    "Garden",
 ]
 _BRANDS = ["TechPrime", "VoltEdge", "BookCo", "SportPeak", "FitCore", "OfficePro"]
 
@@ -63,15 +68,11 @@ def _perturb_predicate(pred: Any, rng: random.Random) -> Any:
         new_low = pred.low
         new_high = pred.high
         if pred.low is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 new_low = float(pred.low) * jitter
-            except (TypeError, ValueError):
-                pass
         if pred.high is not None:
-            try:
+            with contextlib.suppress(TypeError, ValueError):
                 new_high = float(pred.high) * (2.0 - jitter)
-            except (TypeError, ValueError):
-                pass
         return RangePredicate(
             field=pred.field,
             low=new_low,
@@ -130,19 +131,23 @@ class P1WrongScope(AbstractPipeline):
         run_id: str,
         query: QuerySpec,
         df: pd.DataFrame,
-        parquet_path: Optional[Path],
-        gold_answer: Optional[GoldAnswer],
+        parquet_path: Path | None,
+        gold_answer: GoldAnswer | None,
     ) -> tuple[Any, list, list, int, int]:
         events: list = []
         components: list = []
 
         # ── Stage 1: query_load ──
-        t0 = time.perf_counter()
-        events.append(self._make_event(
-            run_id, "query_load", TraceEventType.QUERY_LOAD,
-            f"P1 loaded query {query.query_id} family={query.family.value}",
-            payload={"pipeline": self.pipeline_id, "fault": "wrong_scope"},
-        ))
+        time.perf_counter()
+        events.append(
+            self._make_event(
+                run_id,
+                "query_load",
+                TraceEventType.QUERY_LOAD,
+                f"P1 loaded query {query.query_id} family={query.family.value}",
+                payload={"pipeline": self.pipeline_id, "fault": "wrong_scope"},
+            )
+        )
 
         # ── Stage 2: scope_enumerate (FAULTY) ──
         t1 = time.perf_counter()
@@ -159,27 +164,33 @@ class P1WrongScope(AbstractPipeline):
             scope_df = df[mask].copy()
 
         scope_duration = (time.perf_counter() - t1) * 1000
-        events.append(self._make_event(
-            run_id, "scope_enumerate", TraceEventType.SCOPE_ENUMERATE,
-            f"P1 FAULT: wrong scope predicate applied. "
-            f"Correct scope would have {len(df[compiler.to_pandas_mask(query.scope_predicate, df)])} rows; "
-            f"wrong scope has {len(scope_df)} rows.",
-            record_count_in=len(df),
-            record_count_out=len(scope_df),
-            duration_ms=scope_duration,
-            payload={
-                "fault_type": "wrong_scope",
-                "correct_rows": int(len(df[compiler.to_pandas_mask(query.scope_predicate, df)])),
-                "wrong_rows": int(len(scope_df)),
-                "predicate_type": type(wrong_pred).__name__,
-            },
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "scope_enumerate",
+                TraceEventType.SCOPE_ENUMERATE,
+                f"P1 FAULT: wrong scope predicate applied. "
+                f"Correct scope would have {len(df[compiler.to_pandas_mask(query.scope_predicate, df)])} rows; "
+                f"wrong scope has {len(scope_df)} rows.",
+                record_count_in=len(df),
+                record_count_out=len(scope_df),
+                duration_ms=scope_duration,
+                payload={
+                    "fault_type": "wrong_scope",
+                    "correct_rows": int(
+                        len(df[compiler.to_pandas_mask(query.scope_predicate, df)])
+                    ),
+                    "wrong_rows": int(len(scope_df)),
+                    "predicate_type": type(wrong_pred).__name__,
+                },
+            )
+        )
 
         # Save scope artifact
         scope_path = self.artifacts_dir / run_id / "scope_output.parquet"
         scope_path.parent.mkdir(parents=True, exist_ok=True)
         scope_df.to_parquet(scope_path, index=False)
-        
+
         # ── Stage 3: fact_extract (correct) ──
         t2 = time.perf_counter()
         fields = query.fact_spec.fields
@@ -187,17 +198,21 @@ class P1WrongScope(AbstractPipeline):
         extraction_df = scope_df[avail].copy() if avail else scope_df.copy()
         extract_duration = (time.perf_counter() - t2) * 1000
 
-        events.append(self._make_event(
-            run_id, "fact_extract", TraceEventType.FACT_EXTRACT,
-            f"Extracted {len(avail)} fields from {len(extraction_df)} records",
-            record_count_in=len(scope_df),
-            record_count_out=len(extraction_df),
-            duration_ms=extract_duration,
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "fact_extract",
+                TraceEventType.FACT_EXTRACT,
+                f"Extracted {len(avail)} fields from {len(extraction_df)} records",
+                record_count_in=len(scope_df),
+                record_count_out=len(extraction_df),
+                duration_ms=extract_duration,
+            )
+        )
 
         extract_path = self.artifacts_dir / run_id / "extraction.parquet"
         extraction_df.to_parquet(extract_path, index=False)
-        
+
         # ── Stage 4: aggregate (correct oracle on wrong data) ──
         t3 = time.perf_counter()
         # Build a modified query with the wrong scope but same aggregation spec
@@ -206,24 +221,36 @@ class P1WrongScope(AbstractPipeline):
         answer_value = agg_result.get("result")
         agg_duration = (time.perf_counter() - t3) * 1000
 
-        events.append(self._make_event(
-            run_id, "aggregate", TraceEventType.AGGREGATE,
-            f"Aggregation on wrong scope → {answer_value}",
-            duration_ms=agg_duration,
-            payload={"answer": str(answer_value), "fault_layer": "scope"},
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "aggregate",
+                TraceEventType.AGGREGATE,
+                f"Aggregation on wrong scope → {answer_value}",
+                duration_ms=agg_duration,
+                payload={"answer": str(answer_value), "fault_layer": "scope"},
+            )
+        )
 
         # ── Stage 5: validate ──
-        events.append(self._make_event(
-            run_id, "validate", TraceEventType.VALIDATE,
-            f"Gold comparison: answer={answer_value} gold={gold_answer.answer_value if gold_answer else '?'}",
-            payload={"is_scope_fault": True},
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "validate",
+                TraceEventType.VALIDATE,
+                f"Gold comparison: answer={answer_value} gold={gold_answer.answer_value if gold_answer else '?'}",
+                payload={"is_scope_fault": True},
+            )
+        )
 
         # ── Stage 6: persist ──
-        events.append(self._make_event(
-            run_id, "persist", TraceEventType.PERSIST,
-            "P1 run artifacts persisted",
-        ))
+        events.append(
+            self._make_event(
+                run_id,
+                "persist",
+                TraceEventType.PERSIST,
+                "P1 run artifacts persisted",
+            )
+        )
 
         return answer_value, events, components, 0, 0

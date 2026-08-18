@@ -21,17 +21,15 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
-import pandas as pd
 import orjson
-
+import pandas as pd
 from faulttrace_core.models import (
     ComponentOutput,
-    CoverageCertificate,
     GoldAnswer,
     PipelineRun,
     QuerySpec,
@@ -41,6 +39,7 @@ from faulttrace_core.models import (
 )
 from faulttrace_core.predicates import compiler
 from faulttrace_gold.pandas_engine import PandasEvaluator
+
 from faulttrace_pipelines.base import AbstractPipeline
 
 PIPELINE_ID = "P0-deterministic-scope-baseline"
@@ -52,11 +51,11 @@ pandas_eval = PandasEvaluator()
 class P0DeterministicBaseline(AbstractPipeline):
     """
     Deterministic foundation baseline pipeline (P0).
-    
+
     Uses the safe scope engine and deterministic aggregation.
     No LLM required. Emits complete TraceEvents for all stages.
     """
-    
+
     pipeline_id = PIPELINE_ID
     provider_id = PROVIDER_ID
 
@@ -68,8 +67,8 @@ class P0DeterministicBaseline(AbstractPipeline):
         run_id: str,
         query: QuerySpec,
         df: pd.DataFrame,
-        parquet_path: Optional[Path],
-        gold_answer: Optional[GoldAnswer],
+        parquet_path: Path | None,
+        gold_answer: GoldAnswer | None,
     ) -> tuple[Any, list[TraceEvent], list[ComponentOutput], int, int]:
         # P0 overrides `run()` completely, so `_execute` is never called.
         return None, [], [], 0, 0
@@ -78,21 +77,21 @@ class P0DeterministicBaseline(AbstractPipeline):
         self,
         query: QuerySpec,
         df: pd.DataFrame,
-        gold_answer: Optional[GoldAnswer] = None,
-        parquet_path: Optional[Path] = None,
+        gold_answer: GoldAnswer | None = None,
+        parquet_path: Path | None = None,
     ) -> tuple[PipelineRun, list[TraceEvent], list[ComponentOutput]]:
         """
         Execute the baseline pipeline.
-        
+
         Returns (PipelineRun, [TraceEvent], [ComponentOutput]).
         """
         run_id = str(uuid4())
-        started_at = datetime.now(timezone.utc)
-        
+        started_at = datetime.now(UTC)
+
         # Create run directory
         run_dir = self.artifacts_dir / run_id
         run_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Build run
         run = PipelineRun(
             run_id=run_id,
@@ -103,10 +102,9 @@ class P0DeterministicBaseline(AbstractPipeline):
             status=RunStatus.RUNNING,
         )
         run = run.model_copy(update={"config_hash": run.compute_config_hash(query)})
-        
+
         events: list[TraceEvent] = []
         components: list[ComponentOutput] = []
-        answer = None
         error = None
 
         t0 = time.monotonic()
@@ -119,71 +117,93 @@ class P0DeterministicBaseline(AbstractPipeline):
             # Stage 2: Scope enumeration
             ev2, scoped_df, t0 = self._stage_scope_enumerate(run_id, query, df, ev1.event_id, t0)
             events.append(ev2)
-            components.append(ComponentOutput(
-                component="retrieval",
-                run_id=run_id,
-                stage_index=2,
-                scope_record_ids=scoped_df["record_id"].tolist() if "record_id" in scoped_df.columns else [],
-                scope_record_count=len(scoped_df),
-                scope_artifact_hash=_df_hash(scoped_df),
-            ))
+            components.append(
+                ComponentOutput(
+                    component="retrieval",
+                    run_id=run_id,
+                    stage_index=2,
+                    scope_record_ids=scoped_df["record_id"].tolist()
+                    if "record_id" in scoped_df.columns
+                    else [],
+                    scope_record_count=len(scoped_df),
+                    scope_artifact_hash=_df_hash(scoped_df),
+                )
+            )
 
             # Stage 3: Fact extraction
             ev3, fact_df, t0 = self._stage_fact_extract(run_id, query, scoped_df, ev2.event_id, t0)
             events.append(ev3)
-            components.append(ComponentOutput(
-                component="extraction",
-                run_id=run_id,
-                stage_index=3,
-                extraction_row_count=len(fact_df),
-                extraction_artifact_hash=_df_hash(fact_df),
-            ))
+            components.append(
+                ComponentOutput(
+                    component="extraction",
+                    run_id=run_id,
+                    stage_index=3,
+                    extraction_row_count=len(fact_df),
+                    extraction_artifact_hash=_df_hash(fact_df),
+                )
+            )
 
             # Stage 4: Aggregation
-            ev4, agg_result, agg_plan, t0 = self._stage_aggregate(run_id, query, fact_df, ev3.event_id, t0)
+            ev4, agg_result, agg_plan, t0 = self._stage_aggregate(
+                run_id, query, fact_df, ev3.event_id, t0
+            )
             events.append(ev4)
-            answer = agg_result
-            components.append(ComponentOutput(
-                component="aggregation",
-                run_id=run_id,
-                stage_index=4,
-                aggregation_plan=agg_plan,
-                aggregation_result=agg_result,
-                aggregation_artifact_hash=_dict_hash({"result": agg_result, "plan": agg_plan}),
-            ))
+            components.append(
+                ComponentOutput(
+                    component="aggregation",
+                    run_id=run_id,
+                    stage_index=4,
+                    aggregation_plan=agg_plan,
+                    aggregation_result=agg_result,
+                    aggregation_artifact_hash=_dict_hash({"result": agg_result, "plan": agg_plan}),
+                )
+            )
 
             # Stage 5: Validation
             ev5, is_correct, loss, t0 = self._stage_validate(
                 run_id, query, agg_result, gold_answer, ev4.event_id, t0
             )
             events.append(ev5)
-            components.append(ComponentOutput(
-                component="validation",
-                run_id=run_id,
-                stage_index=5,
-                validation_passed=is_correct,
-                validation_message=ev5.message,
-            ))
+            components.append(
+                ComponentOutput(
+                    component="validation",
+                    run_id=run_id,
+                    stage_index=5,
+                    validation_passed=is_correct,
+                    validation_message=ev5.message,
+                )
+            )
 
             # Stage 6: Persist
             ev6, artifact_refs, t0 = self._stage_persist(
-                run_id, run_dir, query, events, components, scoped_df, fact_df, agg_result, gold_answer, t0
+                run_id,
+                run_dir,
+                query,
+                events,
+                components,
+                scoped_df,
+                fact_df,
+                agg_result,
+                gold_answer,
+                t0,
             )
             events.append(ev6)
 
             # Finalize run
-            latency_ms = (time.monotonic() - (t0 - time.monotonic() + t0)) * 1000
-            completed_at = datetime.now(timezone.utc)
-            run = run.model_copy(update={
-                "status": RunStatus.COMPLETED,
-                "answer": agg_result,
-                "gold_answer_value": gold_answer.answer_value if gold_answer else None,
-                "is_correct": is_correct,
-                "loss": loss,
-                "latency_ms": float((completed_at - started_at).total_seconds() * 1000),
-                "completed_at": completed_at,
-                "artifact_references": artifact_refs,
-            })
+            (time.monotonic() - (t0 - time.monotonic() + t0)) * 1000
+            completed_at = datetime.now(UTC)
+            run = run.model_copy(
+                update={
+                    "status": RunStatus.COMPLETED,
+                    "answer": agg_result,
+                    "gold_answer_value": gold_answer.answer_value if gold_answer else None,
+                    "is_correct": is_correct,
+                    "loss": loss,
+                    "latency_ms": float((completed_at - started_at).total_seconds() * 1000),
+                    "completed_at": completed_at,
+                    "artifact_references": artifact_refs,
+                }
+            )
 
         except Exception as e:
             error = str(e)
@@ -195,11 +215,13 @@ class P0DeterministicBaseline(AbstractPipeline):
                 structured_payload={"error_type": type(e).__name__},
             )
             events.append(error_event)
-            run = run.model_copy(update={
-                "status": RunStatus.FAILED,
-                "error_message": error,
-                "completed_at": datetime.now(timezone.utc),
-            })
+            run = run.model_copy(
+                update={
+                    "status": RunStatus.FAILED,
+                    "error_message": error,
+                    "completed_at": datetime.now(UTC),
+                }
+            )
 
         # Always save trace
         self._save_trace(run_dir, events)
@@ -286,10 +308,12 @@ class P0DeterministicBaseline(AbstractPipeline):
         self, run_id: str, query: QuerySpec, fact_df: pd.DataFrame, parent_id: str, t0: float
     ) -> tuple[TraceEvent, Any, dict, float]:
         t1 = time.monotonic()
-        
-        result, contributing_ids, metadata = pandas_eval._aggregate(query.aggregation_spec, fact_df, query)
+
+        result, contributing_ids, metadata = pandas_eval._aggregate(
+            query.aggregation_spec, fact_df, query
+        )
         agg_result = result
-        
+
         agg_plan = {
             "aggregation_kind": query.aggregation_spec.kind,
             "eligible_count": len(fact_df),
@@ -315,10 +339,10 @@ class P0DeterministicBaseline(AbstractPipeline):
         run_id: str,
         query: QuerySpec,
         answer: Any,
-        gold: Optional[GoldAnswer],
+        gold: GoldAnswer | None,
         parent_id: str,
         t0: float,
-    ) -> tuple[TraceEvent, Optional[bool], Optional[float], float]:
+    ) -> tuple[TraceEvent, bool | None, float | None, float]:
         t1 = time.monotonic()
         is_correct = None
         loss = None
@@ -368,7 +392,7 @@ class P0DeterministicBaseline(AbstractPipeline):
         scoped_df: pd.DataFrame,
         fact_df: pd.DataFrame,
         agg_result: Any,
-        gold: Optional[GoldAnswer],
+        gold: GoldAnswer | None,
         t0: float,
     ) -> tuple[TraceEvent, dict[str, str], float]:
         t1 = time.monotonic()
@@ -392,12 +416,16 @@ class P0DeterministicBaseline(AbstractPipeline):
         # Save gold comparison
         if gold:
             gold_path = run_dir / "gold_answer.json"
-            gold_path.write_text(json.dumps(gold.model_dump(mode="json"), default=str), encoding="utf-8")
+            gold_path.write_text(
+                json.dumps(gold.model_dump(mode="json"), default=str), encoding="utf-8"
+            )
             refs["gold_answer"] = str(gold_path)
 
         # Save query spec
         query_path = run_dir / "query_spec.json"
-        query_path.write_text(json.dumps(query.model_dump(mode="json"), default=str), encoding="utf-8")
+        query_path.write_text(
+            json.dumps(query.model_dump(mode="json"), default=str), encoding="utf-8"
+        )
         refs["query_spec"] = str(query_path)
 
         t2 = time.monotonic()
@@ -430,6 +458,4 @@ def _df_hash(df: pd.DataFrame) -> str:
 
 def _dict_hash(d: dict) -> str:
     """Stable hash of a dict."""
-    return hashlib.sha256(
-        json.dumps(d, sort_keys=True, default=str).encode()
-    ).hexdigest()[:32]
+    return hashlib.sha256(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()[:32]

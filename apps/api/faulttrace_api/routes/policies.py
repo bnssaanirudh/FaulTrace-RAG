@@ -13,7 +13,7 @@ _POLICIES = {
         max_ambiguous_tolerance=0.0,
         min_required_field_completeness=1.0,
         require_ranking_boundary_confidence=True,
-        allow_partial=False
+        allow_partial=False,
     ),
     "warn_partial_v1": AnswerPolicyConfig(
         policy_id="warn_partial_v1",
@@ -23,7 +23,7 @@ _POLICIES = {
         max_ambiguous_tolerance=0.1,
         min_required_field_completeness=0.8,
         require_ranking_boundary_confidence=False,
-        allow_partial=True
+        allow_partial=True,
     ),
     "benchmark_raw_v1": AnswerPolicyConfig(
         policy_id="benchmark_raw_v1",
@@ -33,16 +33,22 @@ _POLICIES = {
         max_ambiguous_tolerance=1.0,
         min_required_field_completeness=0.0,
         require_ranking_boundary_confidence=False,
-        allow_partial=True
-    )
+        allow_partial=True,
+    ),
 }
 
-@router.get("/policies", response_model=list[AnswerPolicyConfig], summary="List available answer policies")
+
+@router.get(
+    "/policies", response_model=list[AnswerPolicyConfig], summary="List available answer policies"
+)
 async def list_policies():
     return list(_POLICIES.values())
 
-@router.get("/policies/{policy_id}", response_model=AnswerPolicyConfig, summary="Get policy details")
+
+@router.get(
+    "/policies/{policy_id}", response_model=AnswerPolicyConfig, summary="Get policy details"
+)
 async def get_policy(policy_id: str):
     if policy_id not in _POLICIES:
-        return _POLICIES["strict_exact_v1"] # Default fallback
+        return _POLICIES["strict_exact_v1"]  # Default fallback
     return _POLICIES[policy_id]

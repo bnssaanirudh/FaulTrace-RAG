@@ -1,11 +1,12 @@
 import hashlib
 import json
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
-from faulttrace_core.llm import ModelProvider, ProviderConfig, ModelOutput, register_provider
+from faulttrace_core.llm import ModelOutput, ModelProvider, ProviderConfig, register_provider
 
 logger = logging.getLogger(__name__)
+
 
 class DeterministicProvider(ModelProvider):
     """
@@ -19,15 +20,15 @@ class DeterministicProvider(ModelProvider):
 
     def generate(self, prompt: str, config: ProviderConfig) -> ModelOutput:
         prompt_hash = hashlib.sha256(prompt.encode()).hexdigest()[:8]
-        
+
         # Token estimation is deterministic
         prompt_tokens = self.estimate_tokens(prompt)
-        
+
         raw_response = f"Deterministic response for {prompt_hash}"
-        parsed_json: Optional[Dict[str, Any]] = None
-        rejected_reason: Optional[str] = None
+        parsed_json: dict[str, Any] | None = None
+        rejected_reason: str | None = None
         completion_tokens = 10
-        
+
         if config.structured_schema:
             if "malformed" in config.model_id:
                 raw_response = "{ this is not valid json ]"
@@ -50,7 +51,7 @@ class DeterministicProvider(ModelProvider):
                 raw_response = "INCORRECT_ANSWER"
             elif "insufficient" in config.model_id:
                 raw_response = "INSUFFICIENT_EVIDENCE"
-            
+
         return ModelOutput(
             raw_response=raw_response,
             parsed_json=parsed_json,
@@ -58,14 +59,14 @@ class DeterministicProvider(ModelProvider):
             prompt_tokens=prompt_tokens,
             completion_tokens=completion_tokens,
             provider_name=self.provider_id(),
-            model_id=config.model_id
+            model_id=config.model_id,
         )
 
     def estimate_tokens(self, text: str) -> int:
         """Rough estimation: 1 token per 4 chars."""
         return max(1, len(text) // 4)
 
-    def _generate_dummy_json(self, schema: Dict[str, Any]) -> Any:
+    def _generate_dummy_json(self, schema: dict[str, Any]) -> Any:
         """Generates a dummy object based on a simple JSON schema."""
         schema_type = schema.get("type", "object")
         if schema_type == "object":
@@ -90,6 +91,7 @@ class DeterministicProvider(ModelProvider):
         else:
             return "unknown_type"
 
+
 def _corrupt_numbers(obj: Any):
     if isinstance(obj, dict):
         for k, v in obj.items():
@@ -103,6 +105,7 @@ def _corrupt_numbers(obj: Any):
                 obj[i] = obj[i] + 1000
             else:
                 _corrupt_numbers(obj[i])
+
 
 # Auto-register
 register_provider(DeterministicProvider)

@@ -7,7 +7,8 @@ from __future__ import annotations
 import csv
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -17,12 +18,13 @@ logger = logging.getLogger("faulttrace.figures")
 # Styling constants - Colorblind-safe palette
 COLORS = ["#ea580c", "#0f172a", "#10b981", "#3b82f6", "#8b5cf6", "#f59e0b", "#ef4444"]
 
+
 class FigureGenerator:
-    def __init__(self, run_records: List[Dict[str, Any]], output_dir: Path):
+    def __init__(self, run_records: list[dict[str, Any]], output_dir: Path):
         self.runs = run_records
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Matplotlib global styling configuration
         plt.rcParams["font.family"] = "sans-serif"
         plt.rcParams["font.sans-serif"] = ["DejaVu Sans", "Inter", "Arial"]
@@ -30,11 +32,21 @@ class FigureGenerator:
         plt.rcParams["axes.labelcolor"] = "#333333"
         plt.rcParams["xtick.color"] = "#333333"
         plt.rcParams["ytick.color"] = "#333333"
-        
-    def _add_watermark(self, fig: plt.Figure):
-        fig.text(0.5, 0.5, 'DEMO', fontsize=40, color='gray', ha='center', va='center', alpha=0.1, rotation=45)
 
-    def generate_all(self) -> List[str]:
+    def _add_watermark(self, fig: plt.Figure):
+        fig.text(
+            0.5,
+            0.5,
+            "DEMO",
+            fontsize=40,
+            color="gray",
+            ha="center",
+            va="center",
+            alpha=0.1,
+            rotation=45,
+        )
+
+    def generate_all(self) -> list[str]:
         """Generates all 10 publication-grade figure formats and writes CSV files."""
         generated_paths = []
         df = pd.DataFrame(self.runs)
@@ -84,7 +96,7 @@ class FigureGenerator:
 
         return generated_paths
 
-    def _write_csv(self, name: str, headers: List[str], rows: List[List[Any]]):
+    def _write_csv(self, name: str, headers: list[str], rows: list[list[Any]]):
         csv_path = self.output_dir / f"{name}.csv"
         with open(csv_path, "w", newline="") as f:
             writer = csv.writer(f)
@@ -105,9 +117,15 @@ class FigureGenerator:
                 acc = subset["is_correct"].mean() if not subset.empty else 0.0
                 accuracies.append(acc)
                 csv_rows.append([p, s, acc])
-            
-            ax.plot(scales, accuracies, marker="o", label=p.split("-")[0], color=COLORS[len(csv_rows) % len(COLORS)])
-        
+
+            ax.plot(
+                scales,
+                accuracies,
+                marker="o",
+                label=p.split("-")[0],
+                color=COLORS[len(csv_rows) % len(COLORS)],
+            )
+
         ax.set_xscale("log")
         ax.set_xlabel("Corpus Scale N (log)")
         ax.set_ylabel("Accuracy")
@@ -128,7 +146,7 @@ class FigureGenerator:
     def _plot_loss_vs_scale(self, df: pd.DataFrame) -> str:
         fig, ax = plt.subplots(figsize=(6, 4))
         scales = sorted(df["scale_n"].unique())
-        
+
         loss_means = []
         csv_rows = []
         for s in scales:
@@ -172,7 +190,7 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [[cov, err] for cov, err in zip(coverages, errors)]
+        rows = [[cov, err] for cov, err in zip(coverages, errors, strict=False)]
         self._write_csv("coverage_vs_error", ["coverage", "error_loss"], rows)
         return str(svg_path)
 
@@ -194,7 +212,7 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [[tk, rec] for tk, rec in zip(top_k_values, recalls)]
+        rows = [[tk, rec] for tk, rec in zip(top_k_values, recalls, strict=False)]
         self._write_csv("topk_sensitivity", ["top_k", "recall"], rows)
         return str(svg_path)
 
@@ -217,7 +235,7 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [[fam, f1] for fam, f1 in zip(families, f1_scores)]
+        rows = [[fam, f1] for fam, f1 in zip(families, f1_scores, strict=False)]
         self._write_csv("extraction_f1", ["query_family", "macro_f1"], rows)
         return str(svg_path)
 
@@ -225,7 +243,7 @@ class FigureGenerator:
         # Boxplot of simulated R/E/A attributions
         svg_path = self.output_dir / "attribution_dist.svg"
         fig, ax = plt.subplots(figsize=(6, 4))
-        
+
         # In a real run, this would be computed from the Shapley matrix
         # For the engineering demo, we show a deterministic placeholder distribution
         data = [
@@ -258,9 +276,18 @@ class FigureGenerator:
         agg_faults = [0.05, 0.05, 0.1]
 
         ax.bar(scales, scope_faults, label="Scope (R)", color="#ea580c", width=0.4)
-        ax.bar(scales, extract_faults, bottom=scope_faults, label="Extraction (E)", color="#3b82f6", width=0.4)
+        ax.bar(
+            scales,
+            extract_faults,
+            bottom=scope_faults,
+            label="Extraction (E)",
+            color="#3b82f6",
+            width=0.4,
+        )
         bottoms = np.array(scope_faults) + np.array(extract_faults)
-        ax.bar(scales, agg_faults, bottom=bottoms, label="Aggregation (A)", color="#8b5cf6", width=0.4)
+        ax.bar(
+            scales, agg_faults, bottom=bottoms, label="Aggregation (A)", color="#8b5cf6", width=0.4
+        )
 
         ax.set_xlabel("Corpus Scale N")
         ax.set_ylabel("Fault Share")
@@ -275,12 +302,12 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [
-            ["10", 0.8, 0.15, 0.05],
-            ["50", 0.7, 0.25, 0.05],
-            ["200", 0.65, 0.25, 0.1]
-        ]
-        self._write_csv("dominant_fault_by_scale", ["scale_n", "scope_fault", "extraction_fault", "aggregation_fault"], rows)
+        rows = [["10", 0.8, 0.15, 0.05], ["50", 0.7, 0.25, 0.05], ["200", 0.65, 0.25, 0.1]]
+        self._write_csv(
+            "dominant_fault_by_scale",
+            ["scale_n", "scope_fault", "extraction_fault", "aggregation_fault"],
+            rows,
+        )
         return str(svg_path)
 
     def _plot_cost_latency_vs_accuracy(self, df: pd.DataFrame) -> str:
@@ -304,7 +331,7 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [[lat, acc] for lat, acc in zip(latencies, accuracies)]
+        rows = [[lat, acc] for lat, acc in zip(latencies, accuracies, strict=False)]
         self._write_csv("cost_latency_vs_accuracy", ["latency_ms", "accuracy"], rows)
         return str(svg_path)
 
@@ -326,7 +353,7 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [[cov, risk] for cov, risk in zip(coverages, risks)]
+        rows = [[cov, risk] for cov, risk in zip(coverages, risks, strict=False)]
         self._write_csv("risk_coverage_curves", ["coverage", "risk"], rows)
         return str(svg_path)
 
@@ -348,6 +375,6 @@ class FigureGenerator:
         fig.savefig(png_path, dpi=300, bbox_inches="tight")
         plt.close(fig)
 
-        rows = [[pipe, acc] for pipe, acc in zip(pipelines, accuracies)]
+        rows = [[pipe, acc] for pipe, acc in zip(pipelines, accuracies, strict=False)]
         self._write_csv("p4_p5_repair_benefit", ["pipeline", "accuracy"], rows)
         return str(svg_path)

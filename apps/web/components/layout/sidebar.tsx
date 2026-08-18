@@ -44,6 +44,16 @@ const navSections = [
     ],
   },
   {
+    label: 'Text Mining',
+    items: [
+      { href: '/benchmarks',  label: 'Benchmarks',         icon: Database },
+      { href: '/retrieval',   label: 'Retrieval Engine',   icon: Globe },
+      { href: '/analytics',   label: 'Corpus Analytics',   icon: BarChart3 },
+      { href: '/evidence',    label: 'Evidence Inspector', icon: Microscope },
+      { href: '/graph',       label: 'Provenance Graph',   icon: Activity },
+    ],
+  },
+  {
     label: 'Analysis',
     items: [
       { href: '/experiments', label: 'Experiments',     icon: BarChart3 },

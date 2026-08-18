@@ -1,9 +1,10 @@
-import time
 import os
+import time
+
 
 def run_benchmarks():
     print("Starting FaultTrace-RAG Performance Benchmarking...")
-    
+
     # Simulate benchmarking RAG pipelines on standard environments
     results = [
         {"pipeline": "P1_BM25_Generative", "scale": 10, "latency_ms": 45, "memory_mb": 120},
@@ -16,19 +17,20 @@ def run_benchmarks():
         {"pipeline": "P5_Certified_Repair", "scale": 50, "latency_ms": 2500, "memory_mb": 1400},
     ]
 
-    time.sleep(1) # simulate work
-    
+    time.sleep(1)  # simulate work
+
     report_path = os.path.join(os.path.dirname(__file__), "..", "reports", "benchmark_results.md")
     os.makedirs(os.path.dirname(report_path), exist_ok=True)
-    
+
     with open(report_path, "w") as f:
         f.write("# FaultTrace-RAG Performance Benchmarks\n\n")
         f.write("| Pipeline | Scale N | Latency (ms) | Memory (MB) |\n")
         f.write("|----------|---------|--------------|-------------|\n")
         for r in results:
             f.write(f"| {r['pipeline']} | {r['scale']} | {r['latency_ms']} | {r['memory_mb']} |\n")
-            
+
     print(f"Benchmarking complete. Results written to {report_path}")
+
 
 if __name__ == "__main__":
     run_benchmarks()

@@ -7,10 +7,6 @@ Set FAULTTRACE_DATABASE_URL to upgrade to PostgreSQL.
 
 from __future__ import annotations
 
-import json
-from datetime import datetime
-from typing import Any, Optional
-
 from sqlalchemy import (
     Boolean,
     Column,
@@ -20,14 +16,13 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
-    event,
 )
-from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 from faulttrace_api.config import get_settings
 
 _engine = None
-_SessionLocal = None
+_session_local = None
 
 
 class Base(DeclarativeBase):
@@ -64,7 +59,7 @@ class QueryRow(Base):
     template_id = Column(String, default="manual")
     version = Column(String, default="1.0")
     spec_json = Column(Text, nullable=False)  # Full QuerySpec JSON
-    gold_json = Column(Text, nullable=True)   # GoldAnswer JSON
+    gold_json = Column(Text, nullable=True)  # GoldAnswer JSON
     created_at = Column(DateTime, nullable=False)
 
 
@@ -87,7 +82,7 @@ class RunRow(Base):
     artifact_refs_json = Column(Text, default="{}")
     started_at = Column(DateTime, nullable=False)
     completed_at = Column(DateTime, nullable=True)
-    
+
     # Certification (Prompt 6)
     raw_answer = Column(Text, nullable=True)
     policy_decision = Column(String, nullable=True)
@@ -104,7 +99,9 @@ class ExperimentRow(Base):
 
     experiment_id = Column(String, primary_key=True)
     name = Column(String, nullable=False)
-    status = Column(String, default="pending")  # pending, running, complete, complete_with_failures, cancelled
+    status = Column(
+        String, default="pending"
+    )  # pending, running, complete, complete_with_failures, cancelled
     config_json = Column(Text, nullable=False)
     created_at = Column(DateTime, nullable=False)
     completed_at = Column(DateTime, nullable=True)
@@ -136,7 +133,7 @@ class TraceEventRow(Base):
 # ---------------------------------------------------------------------------
 
 
-def get_engine(db_url: Optional[str] = None):
+def get_engine(db_url: str | None = None):
     """Get or create the SQLAlchemy engine."""
     global _engine
     if db_url:
@@ -153,16 +150,16 @@ def get_engine(db_url: Optional[str] = None):
 
 
 def get_session_factory():
-    global _SessionLocal
-    if _SessionLocal is None:
-        _SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
-    return _SessionLocal
+    global _session_local
+    if _session_local is None:
+        _session_local = sessionmaker(autocommit=False, autoflush=False, bind=get_engine())
+    return _session_local
 
 
 def get_db():
     """FastAPI dependency: yield a database session."""
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
+    session_local = get_session_factory()
+    db = session_local()
     try:
         yield db
     finally:
@@ -171,5 +168,5 @@ def get_db():
 
 def init_db():
     """Create all tables if they don't exist. Now delegated to Alembic."""
-    engine = get_engine()
+    get_engine()
     # Base.metadata.create_all(engine)

@@ -188,7 +188,7 @@ export const api = {
   listDatasets: (datasetId?: string, activeOnly = true) => {
     const params = new URLSearchParams({ active_only: String(activeOnly) });
     if (datasetId) params.set('dataset_id', datasetId);
-    return apiFetch<{ count: number; snapshots: any[] }>(`/datasets?${params}`);
+    return apiFetch<any>(`/datasets?${params}`).then(res => ({ count: res.total || res.count, snapshots: res.items || res.snapshots }));
   },
   getDatasetSnapshot: (snapshotId: string) => apiFetch<any>(`/datasets/${snapshotId}`),
   validateDatasetSnapshot: (snapshotId: string) => apiFetch<any>(`/datasets/${snapshotId}/validate`),
@@ -197,6 +197,23 @@ export const api = {
     apiFetch<any>('/datasets/ingest', {
       method: 'POST',
       body: JSON.stringify({ input_path: inputPath, dataset_id: datasetId, license_note: licenseNote, max_bytes_mb: maxBytesMb }),
+    }),
+
+  // Text Datasets
+  listTextDatasets: (datasetId?: string, activeOnly = true) => {
+    const params = new URLSearchParams({ active_only: String(activeOnly) });
+    if (datasetId) params.set('dataset_id', datasetId);
+    return apiFetch<{ total: number; items: any[] }>(`/datasets/text?${params}`);
+  },
+  getTextDatasetSnapshot: (snapshotId: string) => apiFetch<any>(`/datasets/text/${snapshotId}`),
+  getTextDatasetPreview: (snapshotId: string, page = 1, pageSize = 10) => {
+    const params = new URLSearchParams({ page: String(page), page_size: String(pageSize) });
+    return apiFetch<any>(`/datasets/text/${snapshotId}/preview?${params}`);
+  },
+  ingestTextDataset: (payload: any) =>
+    apiFetch<any>('/datasets/text/ingest', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   // Experiments

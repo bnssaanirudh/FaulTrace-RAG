@@ -5,16 +5,17 @@ Statistics engine: bootstrap confidence intervals, paired differences, and multi
 from __future__ import annotations
 
 import random
-from typing import Any, Dict, List, Tuple
+
 import numpy as np
 
+
 def compute_paired_bootstrap_ci(
-    data1: List[float],
-    data2: List[float],
+    data1: list[float],
+    data2: list[float],
     confidence_level: float = 0.95,
     samples: int = 1000,
-    seed: int = 42
-) -> Tuple[float, Tuple[float, float], float]:
+    seed: int = 42,
+) -> tuple[float, tuple[float, float], float]:
     """
     Computes paired difference bootstrap confidence intervals between two sample arrays.
     Returns: (mean_difference, (lower_bound, upper_bound), cohens_d_effect_size)
@@ -52,7 +53,8 @@ def compute_paired_bootstrap_ci(
 
     return mean_diff, (lower, upper), float(cohens_d)
 
-def holm_bonferroni_correction(p_values: List[float], alpha: float = 0.05) -> List[bool]:
+
+def holm_bonferroni_correction(p_values: list[float], alpha: float = 0.05) -> list[bool]:
     """
     Applies Holm-Bonferroni correction to a list of p-values to control Family-Wise Error Rate (FWER).
     Returns list of booleans: True if the hypothesis is rejected (statistically significant), False otherwise.

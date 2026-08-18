@@ -3,9 +3,10 @@ Locked Ablation Config Generators.
 Generates deterministic configuration JSONs for standard benchmarks.
 """
 
-import json
 from pathlib import Path
+
 from faulttrace_reporting.experiments import ExperimentSpec
+
 
 def generate_locked_ablations(output_dir: Path):
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -19,12 +20,12 @@ def generate_locked_ablations(output_dir: Path):
         query_families=["count", "mean", "proportion", "comparison", "top_k", "trend"],
         difficulty_strata=["easy", "medium", "adversarial"],
         pipelines=[
-            "P0-deterministic-scope-baseline", 
-            "P1-wrong-scope", 
-            "P2-wrong-facts", 
-            "P3-wrong-aggregation", 
-            "P4-compound-scope-facts", 
-            "P5-full-compound"
+            "P0-deterministic-scope-baseline",
+            "P1-wrong-scope",
+            "P2-wrong-facts",
+            "P3-wrong-aggregation",
+            "P4-compound-scope-facts",
+            "P5-full-compound",
         ],
         providers=["deterministic"],
         models=["gpt-4o-mini"],
@@ -39,7 +40,7 @@ def generate_locked_ablations(output_dir: Path):
         timeout_seconds=30.0,
         retries=3,
         cache_policy="use_cache",
-        tags=["demo", "engineering_validation"]
+        tags=["demo", "engineering_validation"],
     )
     configs.append(("demo_matrix.json", demo_spec))
 
@@ -64,7 +65,7 @@ def generate_locked_ablations(output_dir: Path):
         timeout_seconds=30.0,
         retries=3,
         cache_policy="use_cache",
-        tags=["ablation", "repair"]
+        tags=["ablation", "repair"],
     )
     configs.append(("ablation_p4_vs_p5.json", p4_p5_spec))
 
@@ -91,7 +92,7 @@ def generate_locked_ablations(output_dir: Path):
             timeout_seconds=30.0,
             retries=3,
             cache_policy="use_cache",
-            tags=["ablation", "top_k"]
+            tags=["ablation", "top_k"],
         )
         configs.append((f"ablation_topk_{k}.json", tk_spec))
 
@@ -101,8 +102,9 @@ def generate_locked_ablations(output_dir: Path):
         out_path = output_dir / filename
         out_path.write_text(spec.model_dump_json(indent=2))
         generated.append(out_path)
-    
+
     return generated
+
 
 if __name__ == "__main__":
     out_dir = Path("configs/experiments")

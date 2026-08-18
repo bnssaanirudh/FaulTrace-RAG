@@ -73,10 +73,10 @@ test-smoke:  ## Run end-to-end smoke tests
 ##############################################################################
 
 .PHONY: api
-api:  ## Start the FastAPI backend on port 8001
-	@Write-Host "Starting FastAPI backend on http://localhost:8001 ..." -ForegroundColor Cyan
-	@Write-Host "Docs: http://localhost:8001/docs" -ForegroundColor Yellow
-	$(PYTHON) -m uvicorn faulttrace_api.main:app --host 0.0.0.0 --port 8001 --reload --app-dir apps/api
+api:  ## Start the FastAPI backend on port 8000
+	@Write-Host "Starting FastAPI backend on http://localhost:8000 ..." -ForegroundColor Cyan
+	@Write-Host "Docs: http://localhost:8000/docs" -ForegroundColor Yellow
+	$(PYTHON) -m uvicorn faulttrace_api.main:app --host 0.0.0.0 --port 8000 --reload --app-dir apps/api
 
 .PHONY: web
 web:  ## Start the Next.js frontend on port 3000
@@ -88,7 +88,7 @@ dev:  ## Start API + web concurrently (opens two terminals)
 	@Write-Host "Starting development servers..." -ForegroundColor Cyan
 	@Start-Process powershell -ArgumentList "-NoProfile -Command cd '$$PWD'; make api" -WindowStyle Normal
 	@Start-Process powershell -ArgumentList "-NoProfile -Command cd '$$PWD'; make web" -WindowStyle Normal
-	@Write-Host "✓ API  → http://localhost:8001/docs" -ForegroundColor Green
+	@Write-Host "✓ API  → http://localhost:8000/docs" -ForegroundColor Green
 	@Write-Host "✓ Web  → http://localhost:3000" -ForegroundColor Green
 
 ##############################################################################
@@ -145,7 +145,7 @@ help:  ## Show this help
 	@Write-Host "  make setup    Create venv, install Python + Node deps" -ForegroundColor White
 	@Write-Host "  make seed     Generate deterministic demo corpus worlds" -ForegroundColor White
 	@Write-Host "  make test     Run full test suite (68 tests)" -ForegroundColor White
-	@Write-Host "  make api      Start FastAPI backend  → http://localhost:8001" -ForegroundColor White
+	@Write-Host "  make api      Start FastAPI backend  → http://localhost:8000" -ForegroundColor White
 	@Write-Host "  make web      Start Next.js frontend → http://localhost:3000" -ForegroundColor White
 	@Write-Host "  make dev      Start both in separate terminal windows" -ForegroundColor White
 	@Write-Host "  make lint     Run ruff linter" -ForegroundColor White

@@ -7,11 +7,12 @@ Provides deterministic baseline truths for the three pipeline stages:
 - A (AggregationOracle): The exact aggregated answer for a given set of fact rows.
 """
 
-from typing import Any, Optional
+from typing import Any
+
 import pandas as pd
+from faulttrace_core.models import AggregationSpec, FactSpec, QuerySpec
 from pydantic import BaseModel
 
-from faulttrace_core.models import QuerySpec, FactSpec, AggregationSpec
 from faulttrace_gold.pandas_engine import PandasEvaluator
 
 
@@ -34,22 +35,19 @@ class AggregationOracleResult(BaseModel):
 class ScopeOracle:
     """R*: Returns the gold eligible record set for a QuerySpec."""
 
-    def __init__(self, evaluator: Optional[PandasEvaluator] = None):
+    def __init__(self, evaluator: PandasEvaluator | None = None):
         self.evaluator = evaluator or PandasEvaluator()
 
     def evaluate(self, query: QuerySpec, corpus_df: pd.DataFrame) -> ScopeOracleResult:
         scoped_df = self.evaluator._apply_scope(query.scope_predicate, corpus_df)
         record_ids = scoped_df["record_id"].tolist() if "record_id" in scoped_df.columns else []
-        return ScopeOracleResult(
-            record_ids=record_ids,
-            metadata={"eligible_count": len(scoped_df)}
-        )
+        return ScopeOracleResult(record_ids=record_ids, metadata={"eligible_count": len(scoped_df)})
 
 
 class ExtractionOracle:
     """E*: Returns gold fact rows for a supplied record set."""
 
-    def __init__(self, evaluator: Optional[PandasEvaluator] = None):
+    def __init__(self, evaluator: PandasEvaluator | None = None):
         self.evaluator = evaluator or PandasEvaluator()
 
     def evaluate(self, fact_spec: FactSpec, supplied_df: pd.DataFrame) -> ExtractionOracleResult:
@@ -57,29 +55,27 @@ class ExtractionOracle:
         # The extraction oracle just applies the fact_spec.
         fact_df = self.evaluator._apply_fact_spec(fact_spec, supplied_df)
         fact_rows = fact_df.to_dict(orient="records")
-        
+
         # Ensure all types are python natives, not pandas objects like Timestamp
         # Standardize types for comparison
         import json
+
         fact_rows = json.loads(json.dumps(fact_rows, default=str))
-        
+
         return ExtractionOracleResult(
             fact_rows=fact_rows,
-            metadata={"extracted_count": len(fact_rows), "shape": list(fact_df.shape)}
+            metadata={"extracted_count": len(fact_rows), "shape": list(fact_df.shape)},
         )
 
 
 class AggregationOracle:
     """A*: Applies gold deterministic AggregationSpec to supplied extracted rows."""
 
-    def __init__(self, evaluator: Optional[PandasEvaluator] = None):
+    def __init__(self, evaluator: PandasEvaluator | None = None):
         self.evaluator = evaluator or PandasEvaluator()
 
     def evaluate(
-        self, 
-        agg_spec: AggregationSpec, 
-        supplied_rows: list[dict[str, Any]], 
-        query: QuerySpec
+        self, agg_spec: AggregationSpec, supplied_rows: list[dict[str, Any]], query: QuerySpec
     ) -> AggregationOracleResult:
         # Convert supplied rows to a dataframe for the evaluator
         fact_df = pd.DataFrame(supplied_rows)
@@ -87,12 +83,10 @@ class AggregationOracle:
             # Need to create empty DF with expected columns
             # But we can try just executing it
             pass
-            
+
         # Ensure proper aggregation
         result, contributing_ids, metadata = self.evaluator._aggregate(agg_spec, fact_df, query)
-        
+
         return AggregationOracleResult(
-            answer_value=result,
-            contributing_ids=contributing_ids,
-            metadata=metadata
+            answer_value=result, contributing_ids=contributing_ids, metadata=metadata
         )

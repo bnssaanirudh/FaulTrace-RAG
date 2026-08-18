@@ -7,22 +7,20 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
-
 from faulttrace_core.models import (
     AgreementStatus,
     GoldAnswer,
     QuerySpec,
-    TopKSpec,
-    TrendSpec,
 )
-from faulttrace_gold.pandas_engine import PandasEvaluator
+
 from faulttrace_gold.duckdb_engine import DuckDBEvaluator
+from faulttrace_gold.pandas_engine import PandasEvaluator
 
 pandas_eval = PandasEvaluator()
 duckdb_eval = DuckDBEvaluator()
@@ -31,6 +29,7 @@ duckdb_eval = DuckDBEvaluator()
 @dataclass
 class GoldAgreementResult:
     """Result of agreement check between Pandas and DuckDB engines."""
+
     query_id: str
     agreed: bool
     pandas_result: Any
@@ -38,7 +37,7 @@ class GoldAgreementResult:
     tolerance: float
     agreement_status: AgreementStatus
     diagnostic: str = ""
-    gold_answer: Optional[GoldAnswer] = None
+    gold_answer: GoldAnswer | None = None
 
 
 def _results_agree(
@@ -56,7 +55,7 @@ def _results_agree(
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
             return False
-        return all(_results_agree(x, y, tolerance) for x, y in zip(a, b))
+        return all(_results_agree(x, y, tolerance) for x, y in zip(a, b, strict=False))
     if isinstance(a, dict) and isinstance(b, dict):
         if set(a.keys()) != set(b.keys()):
             return False
@@ -77,11 +76,11 @@ class GoldValidator:
         self,
         query: QuerySpec,
         df: pd.DataFrame,
-        parquet_path: Optional[Path] = None,
+        parquet_path: Path | None = None,
     ) -> GoldAgreementResult:
         """
         Run both evaluators and check agreement.
-        
+
         If parquet_path is provided, DuckDB reads from Parquet.
         Otherwise, DuckDB uses the DataFrame directly.
         """
@@ -95,7 +94,7 @@ class GoldValidator:
             pd_value = None
             pd_ids = []
             pd_eligible = 0
-            pd_error: Optional[str] = str(e)
+            pd_error: str | None = str(e)
         else:
             pd_error = None
 
@@ -107,12 +106,11 @@ class GoldValidator:
                 dk_result = duckdb_eval.evaluate_from_df(query, df)
             dk_value = dk_result["result"]
             dk_ids = dk_result["contributing_ids"]
-            dk_eligible = dk_result["eligible_count"]
+            dk_result["eligible_count"]
         except Exception as e:
             dk_value = None
             dk_ids = []
-            dk_eligible = 0
-            dk_error: Optional[str] = str(e)
+            dk_error: str | None = str(e)
         else:
             dk_error = None
 
@@ -128,20 +126,17 @@ class GoldValidator:
             diagnostic = ""
         else:
             status = AgreementStatus.DISAGREED
-            diagnostic = (
-                f"pandas={pd_value!r} duckdb={dk_value!r} tolerance={query.tolerance}"
-            )
+            diagnostic = f"pandas={pd_value!r} duckdb={dk_value!r} tolerance={query.tolerance}"
 
         # Build GoldAnswer if agreed
         gold = None
         if agreed and status == AgreementStatus.AGREED:
             ids_for_gold = pd_ids or dk_ids
-            evidence_hash = hashlib.sha256(
-                "|".join(sorted(ids_for_gold)).encode()
-            ).hexdigest()[:32]
+            evidence_hash = hashlib.sha256("|".join(sorted(ids_for_gold)).encode()).hexdigest()[:32]
 
             # Extract numerator/denominator for proportion queries
             from faulttrace_core.models import ProportionSpec
+
             numerator = None
             denominator = None
             if isinstance(query.aggregation_spec, ProportionSpec):
@@ -187,15 +182,15 @@ def validate_world_queries(
 ) -> dict[str, Any]:
     """
     Validate all generated queries for a world.
-    
+
     Called by the CLI and used in smoke tests.
     """
     output_dir.mkdir(parents=True, exist_ok=True)
-    
+
     # Load the world parquet
     world_dir = data_dir / "worlds" / world_id
     parquet_path = world_dir / "records.parquet"
-    
+
     if not parquet_path.exists():
         return {
             "total": 0,
@@ -203,7 +198,7 @@ def validate_world_queries(
             "disagreed": 0,
             "error": f"Parquet not found: {parquet_path}",
         }
-    
+
     # Load queries
     queries_path = output_dir.parent / "queries" / f"queries_{world_id}.jsonl"
     if not queries_path.exists():
@@ -213,15 +208,16 @@ def validate_world_queries(
             "disagreed": 0,
             "error": f"Queries not found: {queries_path}",
         }
-    
+
     import pandas as pd_mod
+
     df = pd_mod.read_parquet(parquet_path)
-    
+
     validator = GoldValidator()
     agreed = 0
     disagreed = 0
     results = []
-    
+
     with open(queries_path) as f:
         for line in f:
             if not line.strip():
@@ -230,12 +226,14 @@ def validate_world_queries(
             try:
                 query = QuerySpec.model_validate(q_data)
                 result = validator.validate(query, df, parquet_path)
-                results.append({
-                    "query_id": result.query_id,
-                    "agreed": result.agreed,
-                    "status": result.agreement_status.value,
-                    "diagnostic": result.diagnostic,
-                })
+                results.append(
+                    {
+                        "query_id": result.query_id,
+                        "agreed": result.agreed,
+                        "status": result.agreement_status.value,
+                        "diagnostic": result.diagnostic,
+                    }
+                )
                 if result.agreed:
                     agreed += 1
                 else:
@@ -243,18 +241,18 @@ def validate_world_queries(
             except Exception as e:
                 disagreed += 1
                 results.append({"query_id": q_data.get("query_id"), "error": str(e)})
-    
+
     report = {
         "total": agreed + disagreed,
         "agreed": agreed,
         "disagreed": disagreed,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "timestamp": datetime.now(UTC).isoformat(),
         "world_id": world_id,
         "results": results,
     }
-    
+
     report_path = output_dir / f"gold_report_{world_id}.json"
     report_path.write_text(json.dumps(report, indent=2, default=str))
     report["report_path"] = str(report_path)
-    
+
     return report

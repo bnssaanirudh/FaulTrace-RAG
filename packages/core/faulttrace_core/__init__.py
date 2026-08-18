@@ -5,6 +5,7 @@ This package is independent of FastAPI, SQLAlchemy, and UI frameworks.
 It defines the canonical data models, predicate AST, and schema exports.
 """
 
+from faulttrace_core.edgar_models import EdgarCompanyFacts, EdgarFact
 from faulttrace_core.models import (
     AggregationSpec,
     ComponentOutput,
@@ -18,7 +19,6 @@ from faulttrace_core.models import (
     ScopePredicate,
     TraceEvent,
 )
-from faulttrace_core.edgar_models import EdgarFact, EdgarCompanyFacts
 
 __all__ = [
     "AggregationSpec",

@@ -15,16 +15,15 @@ Tests cover:
 from __future__ import annotations
 
 import json
-import shutil
-import tempfile
 from pathlib import Path
 
-import pandas as pd
-import pytest
 import pyarrow.parquet as pq
+import pytest
 
 TEST_DIR = Path(__file__).parent.resolve()
-VALID_FIXTURE = TEST_DIR.parent.parent.parent / "data" / "fixtures" / "amazon" / "valid_reviews.jsonl"
+VALID_FIXTURE = (
+    TEST_DIR.parent.parent.parent / "data" / "fixtures" / "amazon" / "valid_reviews.jsonl"
+)
 EDGE_FIXTURE = TEST_DIR.parent.parent.parent / "data" / "fixtures" / "amazon" / "edge_cases.jsonl"
 
 
@@ -36,6 +35,7 @@ def tmp_output(tmp_path):
 @pytest.fixture
 def adapter():
     from faulttrace_data.amazon_adapter import AmazonLocalAdapter
+
     return AmazonLocalAdapter(dataset_id="test_dataset")
 
 
@@ -111,7 +111,9 @@ class TestAmazonAdapterValid:
         out1 = tmp_path / "out1"
         out2 = tmp_path / "out2"
         _, snap1 = adapter.ingest(VALID_FIXTURE, out1, data_root=tmp_path)
-        adapter2 = __import__("faulttrace_data.amazon_adapter", fromlist=["AmazonLocalAdapter"]).AmazonLocalAdapter(dataset_id="test_dataset")
+        adapter2 = __import__(
+            "faulttrace_data.amazon_adapter", fromlist=["AmazonLocalAdapter"]
+        ).AmazonLocalAdapter(dataset_id="test_dataset")
         _, snap2 = adapter2.ingest(VALID_FIXTURE, out2, data_root=tmp_path)
         assert snap1.source_path_fingerprint == snap2.source_path_fingerprint
 
@@ -209,10 +211,11 @@ class TestAmazonAdapterEdgeCases:
 class TestAmazonAdapterFieldMapping:
     def test_custom_field_mapping(self, tmp_output):
         """Custom field mapping should override defaults."""
-        from faulttrace_data.amazon_adapter import AmazonLocalAdapter, AmazonFieldMapping
+        import json
 
         # Write a temp JSONL with custom field names
-        import tempfile, json
+        from faulttrace_data.amazon_adapter import AmazonFieldMapping, AmazonLocalAdapter
+
         custom_data = {
             "product_asin": "B99CUSTOM1",
             "product_title": "Custom Field Test Product",
@@ -244,6 +247,7 @@ class TestAmazonAdapterFieldMapping:
 
     def test_config_hash_stable(self):
         from faulttrace_data.amazon_adapter import AmazonFieldMapping
+
         m = AmazonFieldMapping()
         h1 = m.config_hash()
         h2 = m.config_hash()
@@ -255,6 +259,7 @@ class TestSizeLimitGuard:
     def test_size_limit_raises(self, tmp_output):
         """Adapter should raise ValueError when file exceeds configured limit."""
         from faulttrace_data.amazon_adapter import AmazonLocalAdapter
+
         adapter = AmazonLocalAdapter(dataset_id="test", max_bytes=10)  # 10 bytes limit
         with pytest.raises(ValueError, match="size limit"):
             report, _ = adapter.ingest(VALID_FIXTURE, tmp_output, data_root=tmp_output.parent)

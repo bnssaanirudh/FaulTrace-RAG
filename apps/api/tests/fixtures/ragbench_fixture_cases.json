@@ -1,0 +1,35 @@
+[
+  {
+    "case_id": "ragbench_supported_001",
+    "dataset_id": "ragbench",
+    "query_id": "rb001",
+    "query_text": "What is the capital of France?",
+    "doc_id": "rb_doc_001",
+    "doc_text": "France is a country in Western Europe. Its capital city is Paris, which is also the most populous city in the country. Paris has been the capital since the 10th century.",
+    "gold_support_status": "supported",
+    "expected_answer": "Paris",
+    "description": "Clear factual answer fully supported by document"
+  },
+  {
+    "case_id": "ragbench_partial_001",
+    "dataset_id": "ragbench",
+    "query_id": "rb002",
+    "query_text": "How many endangered species are there globally and what is the primary cause?",
+    "doc_id": "rb_doc_002",
+    "doc_text": "According to the IUCN Red List, over 40,000 species are currently threatened with extinction. Habitat destruction is considered a major contributing factor to species decline.",
+    "gold_support_status": "partially_supported",
+    "expected_answer": "Over 40,000 species; habitat destruction (partial — 'major' not 'primary')",
+    "description": "Count partially supported; causation framing differs from query"
+  },
+  {
+    "case_id": "ragbench_unsupported_001",
+    "dataset_id": "ragbench",
+    "query_id": "rb003",
+    "query_text": "The Moon was formed by a collision between Earth and a Mars-sized body called Theia 4.5 billion years ago.",
+    "doc_id": "rb_doc_003",
+    "doc_text": "The formation of the Solar System began approximately 4.6 billion years ago from a molecular cloud. The inner planets formed through accretion of planetesimals. Jupiter formed quickly, capturing large amounts of gas.",
+    "gold_support_status": "unsupported",
+    "expected_answer": null,
+    "description": "Document discusses solar system formation but never mentions Moon's origin or Theia"
+  }
+]
