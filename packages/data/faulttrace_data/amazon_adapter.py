@@ -50,7 +50,7 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from faulttrace_core.models import CorpusRecord, RecordCategory
-from faulttrace_data.snapshot_registry import DatasetSnapshot
+from faulttrace_data.snapshot import DatasetSnapshot
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
