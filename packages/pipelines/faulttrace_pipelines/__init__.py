@@ -15,6 +15,9 @@ Attribution:
   ComponentAttribution     — per-component attribution
 """
 
+# Ensure LLM providers are registered
+import faulttrace_pipelines.llm.deterministic
+import faulttrace_pipelines.llm.openai_provider
 from faulttrace_pipelines.attribution import (
     AttributionResult,
     ComponentAttribution,

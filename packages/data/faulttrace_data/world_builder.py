@@ -24,17 +24,16 @@ from __future__ import annotations
 import hashlib
 import json
 import random
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 import yaml
-from pydantic import BaseModel, Field, field_validator
-
 from faulttrace_core.models import SCHEMA_VERSION
+from pydantic import BaseModel, Field, field_validator
 
 WORLD_BUILDER_VERSION = "2.0.0"
 
@@ -123,22 +122,22 @@ class WorldManifestV2(BaseModel):
     parquet_hash: str
     jsonl_hash: str
     summary_stats: dict[str, Any]
-    parent_world_id: Optional[str] = None
+    parent_world_id: str | None = None
     created_at: str
 
     # Prompt 2 additions (all optional for backward compatibility)
     dataset_id: str = "track_m"
     source_type: str = "generated"
     sampling_policy: str = "deterministic_prefix"
-    producing_command: Optional[str] = None
-    config_hash: Optional[str] = None
+    producing_command: str | None = None
+    config_hash: str | None = None
     parent_artifact_refs: list[str] = Field(default_factory=list)
     record_ids_hash: str = ""
-    record_ids_artifact: Optional[str] = None  # Path to sorted record IDs JSONL
+    record_ids_artifact: str | None = None  # Path to sorted record IDs JSONL
     divergence_from_parent: dict[str, Any] = Field(default_factory=dict)
     adversarial_slice_types: list[str] = Field(default_factory=list)
-    group_id: Optional[str] = None
-    snapshot_id: Optional[str] = None
+    group_id: str | None = None
+    snapshot_id: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -159,13 +158,13 @@ class WorldBuilder:
         source_parquet: Path,
         dataset_id: str = "track_m",
         seed: int = 42,
-        group_id: Optional[str] = None,
+        group_id: str | None = None,
     ):
         self.source_parquet = source_parquet
         self.dataset_id = dataset_id
         self.seed = seed
         self.group_id = group_id
-        self._df: Optional[pd.DataFrame] = None
+        self._df: pd.DataFrame | None = None
 
     def _load_df(self) -> pd.DataFrame:
         """Load source Parquet lazily."""
@@ -185,7 +184,7 @@ class WorldBuilder:
         scales: list[int],
         output_dir: Path,
         policy: str = "deterministic_prefix",
-        producing_command: Optional[str] = None,
+        producing_command: str | None = None,
     ) -> list[WorldManifestV2]:
         """
         Build a sequence of nested worlds at increasing scales.
@@ -213,7 +212,7 @@ class WorldBuilder:
 
         results = []
         parent_world_id = None
-        parent_record_ids: Optional[list[str]] = None
+        parent_record_ids: list[str] | None = None
 
         for n in scales_sorted:
             world_id = f"world_{self.dataset_id}_s{self.seed}_n{n}"
@@ -268,7 +267,7 @@ class WorldBuilder:
                     current_cats = set(world_df["category"].unique())
                     divergence["new_categories"] = list(current_cats - parent_cats)
 
-            now = datetime.now(timezone.utc).isoformat()
+            now = datetime.now(UTC).isoformat()
             manifest = WorldManifestV2(
                 world_id=world_id,
                 seed=self.seed,
@@ -306,7 +305,7 @@ class WorldBuilder:
     def build_adversarial_slices(
         self,
         output_dir: Path,
-        slice_types: Optional[list[str]] = None,
+        slice_types: list[str] | None = None,
     ) -> dict[str, WorldManifestV2]:
         """
         Build adversarial world slices for edge-case testing.
@@ -363,7 +362,7 @@ class WorldBuilder:
                 parquet_hash = _file_sha256(parquet_path)
                 jsonl_hash = _file_sha256(jsonl_path)
 
-                now = datetime.now(timezone.utc).isoformat()
+                now = datetime.now(UTC).isoformat()
                 manifest = WorldManifestV2(
                     world_id=world_id,
                     seed=self.seed,
@@ -483,14 +482,14 @@ class WorldBuilder:
     # Adversarial slice helpers
     # ------------------------------------------------------------------
 
-    def _slice_null_heavy(self, df: pd.DataFrame, rng: random.Random) -> Optional[pd.DataFrame]:
+    def _slice_null_heavy(self, df: pd.DataFrame, rng: random.Random) -> pd.DataFrame | None:
         """Records where price is null."""
         if "price" not in df.columns:
             return None
         null_df = df[df["price"].isna()]
         return null_df.sample(min(50, len(null_df)), random_state=self.seed) if len(null_df) > 0 else None
 
-    def _slice_tie_heavy(self, df: pd.DataFrame, rng: random.Random) -> Optional[pd.DataFrame]:
+    def _slice_tie_heavy(self, df: pd.DataFrame, rng: random.Random) -> pd.DataFrame | None:
         """Records chosen to maximize rating/brand ties."""
         if "brand" not in df.columns:
             return None
@@ -502,7 +501,7 @@ class WorldBuilder:
             return None
         return df[df["brand"].isin(tied_brands)]
 
-    def _slice_rare_category(self, df: pd.DataFrame, rng: random.Random) -> Optional[pd.DataFrame]:
+    def _slice_rare_category(self, df: pd.DataFrame, rng: random.Random) -> pd.DataFrame | None:
         """Records from the least-common category."""
         if "category" not in df.columns:
             return None
@@ -510,7 +509,7 @@ class WorldBuilder:
         rare_cat = cat_counts.index[-1]
         return df[df["category"] == rare_cat]
 
-    def _slice_date_boundary(self, df: pd.DataFrame, rng: random.Random) -> Optional[pd.DataFrame]:
+    def _slice_date_boundary(self, df: pd.DataFrame, rng: random.Random) -> pd.DataFrame | None:
         """Records near year/quarter boundaries."""
         if "event_time" not in df.columns:
             return None
@@ -521,7 +520,7 @@ class WorldBuilder:
         result = df[boundary]
         return result if len(result) > 0 else df.sample(min(10, len(df)), random_state=self.seed)
 
-    def _slice_near_equal(self, df: pd.DataFrame, rng: random.Random) -> Optional[pd.DataFrame]:
+    def _slice_near_equal(self, df: pd.DataFrame, rng: random.Random) -> pd.DataFrame | None:
         """Records where two groups have nearly equal mean ratings."""
         if "category" not in df.columns or "rating" not in df.columns:
             return None

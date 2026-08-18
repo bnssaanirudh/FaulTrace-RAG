@@ -17,15 +17,13 @@ Design decisions:
 from __future__ import annotations
 
 import hashlib
-import json
-import os
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from uuid import uuid4
 
 import orjson
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 SNAPSHOT_SCHEMA_VERSION = "2.0.0"
 
@@ -36,7 +34,7 @@ SNAPSHOT_SCHEMA_VERSION = "2.0.0"
 
 
 def _utcnow() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def _sha256(data: str | bytes) -> str:
@@ -105,18 +103,18 @@ class DatasetSnapshot(BaseModel):
     # Source provenance (no absolute path)
     source_type: str = Field(..., description="'generated', 'amazon_jsonl', 'amazon_csv', 'amazon_parquet'")
     source_path_fingerprint: str = Field(..., description="SHA-256 of relative source path; no absolute path stored")
-    source_file_size_bytes: Optional[int] = None
+    source_file_size_bytes: int | None = None
     source_row_count_raw: int = 0
 
     # Canonical output
     canonical_schema_version: str = SNAPSHOT_SCHEMA_VERSION
     row_count: int = 0
     partition_count: int = 0
-    parquet_root: Optional[str] = None  # relative path under data_root
+    parquet_root: str | None = None  # relative path under data_root
 
     # Temporal coverage
-    min_timestamp: Optional[str] = None
-    max_timestamp: Optional[str] = None
+    min_timestamp: str | None = None
+    max_timestamp: str | None = None
 
     # Summary statistics
     category_counts: dict[str, int] = Field(default_factory=dict)
@@ -137,14 +135,14 @@ class DatasetSnapshot(BaseModel):
     duplicate_count: int = 0
     malformed_count: int = 0
     null_count_by_field: dict[str, int] = Field(default_factory=dict)
-    rejected_row_artifact_ref: Optional[str] = None
+    rejected_row_artifact_ref: str | None = None
 
     # Provenance
     license_note: str = Field(
         default="",
         description="License/provenance note entered by the researcher",
     )
-    producing_command: Optional[str] = None
+    producing_command: str | None = None
     creation_tool_version: str = "faulttrace-2.0.0"
     environment_summary: dict[str, Any] = Field(default_factory=dict)
 
@@ -221,7 +219,7 @@ class SnapshotRegistry:
     # Read operations
     # ------------------------------------------------------------------
 
-    def list_snapshots(self, dataset_id: Optional[str] = None, active_only: bool = True) -> list[DatasetSnapshot]:
+    def list_snapshots(self, dataset_id: str | None = None, active_only: bool = True) -> list[DatasetSnapshot]:
         """List snapshots, optionally filtered by dataset_id and active status."""
         records = self._load_all()
         if dataset_id:
@@ -230,7 +228,7 @@ class SnapshotRegistry:
             records = [r for r in records if r.active]
         return records
 
-    def inspect(self, snapshot_id: str) -> Optional[DatasetSnapshot]:
+    def inspect(self, snapshot_id: str) -> DatasetSnapshot | None:
         """Return a single snapshot by ID, or None if not found."""
         for r in self._load_all():
             if r.snapshot_id == snapshot_id:

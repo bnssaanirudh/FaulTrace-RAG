@@ -14,24 +14,22 @@ from __future__ import annotations
 import hashlib
 import json
 import random
-import uuid
-from datetime import datetime, timezone, timedelta
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional, Any
+from typing import Any
 
 import orjson
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from pydantic import BaseModel
-
 from faulttrace_core.models import (
+    SCHEMA_VERSION,
     CorpusRecord,
     CorpusWorld,
     RecordCategory,
-    SCHEMA_VERSION,
 )
+from pydantic import BaseModel
 
 GENERATOR_VERSION = "1.0.0"
 
@@ -144,7 +142,7 @@ _CATEGORY_SHORT = {
 }
 
 # Timestamp distribution: clustered around specific periods
-_BASE_DATE = datetime(2020, 1, 1, tzinfo=timezone.utc)
+_BASE_DATE = datetime(2020, 1, 1, tzinfo=UTC)
 _DATE_RANGE_DAYS = 1460  # ~4 years
 
 
@@ -167,7 +165,7 @@ class WorldManifest(BaseModel):
     parquet_hash: str
     jsonl_hash: str
     summary_stats: dict[str, Any]
-    parent_world_id: Optional[str] = None
+    parent_world_id: str | None = None
     created_at: str
 
 
@@ -187,7 +185,7 @@ class TrackMGenerator:
 
     def __init__(self, seed: int = 42):
         self.seed = seed
-        self._rng: Optional[random.Random] = None
+        self._rng: random.Random | None = None
 
     def _make_rng(self) -> random.Random:
         """Create a seeded RNG from seed + generator version for stability."""
@@ -214,14 +212,14 @@ class TrackMGenerator:
         # Separate RNG for product ID pool (always fixed size)
         pool_rng = random.Random(f"pool:{GENERATOR_VERSION}:{self.seed}")
         product_ids = [self._gen_asin(pool_rng) for _ in range(self._PRODUCT_ID_POOL)]
-        
+
         rng = self._make_rng()
         records = []
-        
+
         for i in range(n):
             record = self._generate_record(rng, i, product_ids)
             records.append(record)
-        
+
         return records
 
     def _gen_asin(self, rng: random.Random) -> str:
@@ -235,18 +233,18 @@ class TrackMGenerator:
         """Generate a single record with realistic distributions."""
         category = rng.choices(_CATEGORY_NAMES, weights=_CATEGORY_WEIGHTS)[0]
         brands = _BRANDS_BY_CATEGORY[category]
-        
+
         # Long-tail brand distribution: top 3 brands get 60% of reviews
         brand_weights = [0.25, 0.20, 0.15] + [0.4 / (len(brands) - 3)] * (len(brands) - 3)
         brand = rng.choices(brands, weights=brand_weights[:len(brands)])[0]
-        
+
         # Rating with realistic skew toward 4-5 stars
         rating = float(rng.choices([1, 2, 3, 4, 5], weights=_RATING_WEIGHTS)[0])
-        
+
         # Add half-star variants occasionally
         if rng.random() < 0.3:
             rating = min(5.0, rating + 0.5)
-        
+
         # Timestamp with clustering
         base_offset = int(rng.gauss(180, 120))
         base_offset = max(0, min(_DATE_RANGE_DAYS, base_offset))
@@ -258,22 +256,22 @@ class TrackMGenerator:
             base_offset = year_offset + day_offset
             base_offset = min(_DATE_RANGE_DAYS, base_offset)
         event_time = _BASE_DATE + timedelta(days=base_offset)
-        
+
         # Price: sparse (30% missing), realistic distribution
         price = None
         if rng.random() > 0.30:
             price = Decimal(str(round(rng.lognormvariate(3.5, 1.2), 2)))
             price = max(Decimal("0.99"), min(Decimal("999.99"), price))
-        
+
         # Helpful votes: sparse, heavy-tail
         helpful_votes = 0
         if rng.random() < 0.35:
             helpful_votes = int(rng.paretovariate(1.5))
             helpful_votes = min(helpful_votes, 10000)
-        
+
         # Verified purchase: 70% verified
         verified_purchase = rng.random() < 0.70
-        
+
         # Title: may have duplicates across products
         title_tmpl = rng.choice(_TITLE_TEMPLATES)
         model_num = rng.randint(100, 999)
@@ -284,19 +282,19 @@ class TrackMGenerator:
             model_num=model_num,
             year=year,
         )
-        
+
         # Product ID: use pre-generated IDs, with some parent relationships
         product_id = product_ids[index % len(product_ids)]
         parent_id = None
         if rng.random() < 0.25 and index >= 5:
             parent_id = product_ids[(index - rng.randint(1, 5)) % len(product_ids)]
-        
+
         # Source record ID
         source_record_id = f"R{self.seed:04d}_{index:06d}"
-        
+
         # World ID placeholder (will be set by caller)
         world_id = f"seed_{self.seed}"
-        
+
         # Raw payload hash
         raw_payload = {
             "index": index,
@@ -306,13 +304,13 @@ class TrackMGenerator:
         raw_payload_hash = hashlib.sha256(
             orjson.dumps(raw_payload, option=orjson.OPT_SORT_KEYS)
         ).hexdigest()[:32]
-        
+
         # Review text
         text = rng.choice(_REVIEW_TEMPLATES)
-        
+
         # Deterministic record ID
         record_id = f"rec_{self.seed:04d}_{index:06d}"
-        
+
         # Attributes: extensible
         attributes: dict[str, Any] = {
             "subcategory": f"{category.value}/{brand}",
@@ -321,7 +319,7 @@ class TrackMGenerator:
             attributes["color"] = rng.choice(["Black", "White", "Red", "Blue", "Green"])
         if rng.random() < 0.3:
             attributes["size"] = rng.choice(["S", "M", "L", "XL", "One Size"])
-        
+
         return CorpusRecord(
             record_id=record_id,
             source="track_m_synthetic",
@@ -346,8 +344,8 @@ class TrackMGenerator:
         self,
         n: int,
         output_dir: Path,
-        world_id: Optional[str] = None,
-        parent_world_id: Optional[str] = None,
+        world_id: str | None = None,
+        parent_world_id: str | None = None,
     ) -> tuple[CorpusWorld, WorldManifest]:
         """
         Generate a corpus world of n records and save to disk.
@@ -356,46 +354,46 @@ class TrackMGenerator:
         """
         if world_id is None:
             world_id = f"world_s{self.seed}_n{n}"
-        
+
         output_dir.mkdir(parents=True, exist_ok=True)
-        
+
         # Generate records
         records = self.generate_records(n)
-        
+
         # Update world_id in records
         updated_records = []
         for r in records:
             updated_records.append(r.model_copy(update={"world_id": world_id}))
         records = updated_records
-        
+
         # Convert to DataFrame
         df = self._records_to_df(records)
-        
+
         # Save Parquet
         parquet_path = output_dir / "records.parquet"
         table = pa.Table.from_pandas(df, preserve_index=False)
         pq.write_table(table, parquet_path, compression="snappy")
-        
+
         # Save JSONL
         jsonl_path = output_dir / "records.jsonl"
         with open(jsonl_path, "wb") as f:
             for record in records:
                 f.write(record.model_dump_json_bytes())
                 f.write(b"\n")
-        
+
         # Compute file hashes
         parquet_hash = _file_hash(parquet_path)
         jsonl_hash = _file_hash(jsonl_path)
-        
+
         # Summary statistics
         summary_stats = self._compute_summary(df)
-        
+
         # Record IDs hash
         sorted_ids = sorted(r.record_id for r in records)
         record_ids_hash = hashlib.sha256(
             "|".join(sorted_ids).encode()
         ).hexdigest()[:32]
-        
+
         # Create CorpusWorld
         world = CorpusWorld(
             world_id=world_id,
@@ -405,9 +403,9 @@ class TrackMGenerator:
             record_ids_hash=record_ids_hash,
             manifest_path=str(output_dir / "manifest.json"),
         )
-        
+
         # Create manifest
-        now = datetime.now(timezone.utc).isoformat()
+        now = datetime.now(UTC).isoformat()
         manifest = WorldManifest(
             world_id=world_id,
             seed=self.seed,
@@ -421,13 +419,13 @@ class TrackMGenerator:
             parent_world_id=parent_world_id,
             created_at=now,
         )
-        
+
         # Save manifest
         manifest_path = output_dir / "manifest.json"
         manifest_path.write_text(
             json.dumps(manifest.model_dump(), indent=2, default=str)
         )
-        
+
         return world, manifest
 
     def generate_nested_worlds(
@@ -444,7 +442,7 @@ class TrackMGenerator:
         scales_sorted = sorted(scales)
         results = []
         parent_world_id = None
-        
+
         for n in scales_sorted:
             world_id = f"world_s{self.seed}_n{n}"
             world_dir = output_dir / world_id
@@ -456,7 +454,7 @@ class TrackMGenerator:
             )
             results.append((world, manifest))
             parent_world_id = world_id
-        
+
         return results
 
     def generate_adversarial_fixtures(self, output_dir: Path) -> dict[str, Any]:
@@ -469,19 +467,19 @@ class TrackMGenerator:
         output_dir.mkdir(parents=True, exist_ok=True)
         fixtures: dict[str, Any] = {}
         rng = random.Random(f"adversarial:{self.seed}")
-        
+
         # 1. Tie in ranking: multiple brands with identical counts
         tie_records = self._gen_tie_fixture(rng)
         fixtures["ties"] = tie_records
-        
+
         # 2. Empty scope: predicate that matches no records
         empty_record = self._gen_base_record(rng, 0, "empty_world")
         fixtures["empty_scope_sample"] = [empty_record]
-        
+
         # 3. One-record scope
         one_record = self._gen_base_record(rng, 1, "one_record_world")
         fixtures["one_record"] = [one_record]
-        
+
         # 4. Null-heavy: 90% of prices missing
         null_records = []
         for i in range(20):
@@ -490,19 +488,19 @@ class TrackMGenerator:
                 r = r.model_copy(update={"price": None})
             null_records.append(r)
         fixtures["null_heavy"] = null_records
-        
+
         # 5. Boundary dates: records at exact date boundaries
         boundary_records = []
         boundary_times = [
-            datetime(2021, 12, 31, 23, 59, 59, tzinfo=timezone.utc),
-            datetime(2022, 1, 1, 0, 0, 0, tzinfo=timezone.utc),
-            datetime(2022, 1, 1, 0, 0, 1, tzinfo=timezone.utc),
+            datetime(2021, 12, 31, 23, 59, 59, tzinfo=UTC),
+            datetime(2022, 1, 1, 0, 0, 0, tzinfo=UTC),
+            datetime(2022, 1, 1, 0, 0, 1, tzinfo=UTC),
         ]
         for i, bt in enumerate(boundary_times):
             r = self._gen_base_record(rng, i, "boundary_world")
             boundary_records.append(r.model_copy(update={"event_time": bt}))
         fixtures["boundary_dates"] = boundary_records
-        
+
         # 6. Near-equal means: two groups with means differing by < 0.01
         near_equal = []
         for i in range(10):
@@ -510,7 +508,7 @@ class TrackMGenerator:
             rating = 3.5 + (i % 2) * 0.005  # 3.5 vs 3.505
             near_equal.append(r.model_copy(update={"rating": rating}))
         fixtures["near_equal_means"] = near_equal
-        
+
         # Save fixtures
         for name, fixture_records in fixtures.items():
             if isinstance(fixture_records, list) and len(fixture_records) > 0:
@@ -519,7 +517,7 @@ class TrackMGenerator:
                     for r in fixture_records:
                         f.write(r.model_dump_json_bytes())
                         f.write(b"\n")
-        
+
         return {k: len(v) if isinstance(v, list) else v for k, v in fixtures.items()}
 
     def _gen_tie_fixture(self, rng: random.Random) -> list[CorpusRecord]:

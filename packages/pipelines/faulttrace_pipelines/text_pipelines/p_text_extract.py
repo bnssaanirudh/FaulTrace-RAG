@@ -17,7 +17,7 @@ from typing import Any
 from faulttrace_core.evidence import AggregatedExtractionResult
 from faulttrace_core.extraction_providers import (
     BoundedRepairExtractor,
-    DeterministicFixtureExtractor,
+    get_default_extractor,
 )
 from faulttrace_core.knowledge_graph import ProvenanceGraphBuilder
 from faulttrace_core.retrieval import RetrievalUnit
@@ -46,7 +46,7 @@ class PTextExtract:
         self.top_k = top_k
         self.artifacts_dir = artifacts_dir
         self.save_graph = save_graph
-        base_extractor = DeterministicFixtureExtractor()
+        base_extractor = get_default_extractor()
         self.extractor = BoundedRepairExtractor(base_extractor, max_retries=max_repair_retries)
         self._answer_pipeline = PTextAnswer(
             retriever_type=retriever_type, top_k=top_k, max_repair_retries=max_repair_retries
@@ -65,14 +65,14 @@ class PTextExtract:
         t0 = time.perf_counter()
 
         # Stage 1 + 2: Retrieval + per-doc extraction (reuse PTextAnswer logic)
-        bm25 = index_manager.get_or_build("bm25", units, BM25Retriever(), {})
+        bm25 = index_manager.get_or_build("bm25", units, BM25Retriever(), {}, dataset_id=dataset_id)
         if self.retriever_type == "bm25":
             retrieved = bm25.search(query_text, top_k=self.top_k)
         elif self.retriever_type == "dense":
-            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {}, dataset_id=dataset_id)
             retrieved = dense.search(query_text, top_k=self.top_k)
         else:
-            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {}, dataset_id=dataset_id)
             hybrid = HybridRetriever(bm25, dense)
             hybrid.units = units
             retrieved = hybrid.search(query_text, top_k=self.top_k)
@@ -125,7 +125,7 @@ class PTextExtract:
                 graph_stats = graph.stats()
 
                 self.artifacts_dir.mkdir(parents=True, exist_ok=True)
-                graph_path = self.artifacts_dir / f"graph_{query_id}.json"
+                graph_path = self.artifacts_dir / f"graph_{dataset_id}_{query_id}.json"
                 graph.save(graph_path)
             except Exception as e:
                 graph_stats = {"error": str(e)}

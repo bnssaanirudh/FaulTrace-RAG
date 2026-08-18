@@ -61,6 +61,16 @@ class BenchmarkRunner:
 
         for qid in query_ids:
             query_text = queries[qid]
+            if not query_text or not query_text.strip():
+                results.append({
+                    "query_id": qid,
+                    "dataset_id": self.dataset_id,
+                    "pipeline_id": self.pipeline.pipeline_id,
+                    "error": "Empty query text",
+                    "status": "failed",
+                })
+                continue
+
             gold_status = None
 
             try:
@@ -86,11 +96,12 @@ class BenchmarkRunner:
 
         # Compute retrieval metrics if qrels provided
         retrieval_metrics = {}
-        if qrels and hasattr(results[0], "get") and results[0].get("ranked_doc_ids"):
+        if qrels and results:
             ranked_results = {
-                r["query_id"]: r["ranked_doc_ids"] for r in results if "ranked_doc_ids" in r
+                r["query_id"]: r["ranked_doc_ids"] for r in results if isinstance(r, dict) and "ranked_doc_ids" in r
             }
-            retrieval_metrics = evaluate_retrieval(ranked_results, qrels)
+            if ranked_results:
+                retrieval_metrics = evaluate_retrieval(ranked_results, qrels)
 
         # Persist
         df = pd.DataFrame(results)

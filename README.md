@@ -23,6 +23,7 @@ By systematically replacing each component with a deterministic oracle (using ou
 - **Dual Gold Evaluation Engine:** Verifies ground-truth query answers against deterministic Pandas and DuckDB evaluations (100% parity validated).
 - **Selective Prediction Certification:** Issues mathematical coverage certificates indicating whether an LLM's answer is trustable based on lexical ambiguity and trace evidence.
 - **Advanced Graph Neural Extraction (GNN):** Parses structural scientific corpora (e.g. Springer ToC) into localized knowledge graphs using `torch_geometric`.
+- **Text Benchmark Integration:** Fully supports BEIR SciFact datasets for true text-mining and fact-checking pipelines.
 - **Multi-Track Synthetic Corpora:** Includes full synthetic data pipelines for Amazon Reviews (Track M) and Semantic Geoparsing (Track T).
 - **Interactive Next.js Trace Inspector:** Deep dive into LLM context chunks, extraction traces, and tie-breaking policies.
 - **Experiment Runner & R Diagnostics:** Run YAML-based specification sweeps and automatically output academic publication plots (accuracy-degradation, Shapley bootstraps) using `ggplot2` and `boot`.

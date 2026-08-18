@@ -18,7 +18,7 @@ from typing import Any
 from faulttrace_core.evidence import CitedAnswer, SupportStatus
 from faulttrace_core.extraction_providers import (
     BoundedRepairExtractor,
-    DeterministicFixtureExtractor,
+    get_default_extractor,
 )
 from faulttrace_core.retrieval import RetrievalUnit
 from faulttrace_core.retrieval_bm25 import BM25Retriever
@@ -42,7 +42,7 @@ class PTextAnswer:
         self.retriever_type = retriever_type
         self.top_k = top_k
         self.artifacts_dir = artifacts_dir
-        base_extractor = DeterministicFixtureExtractor()
+        base_extractor = get_default_extractor()
         self.extractor = BoundedRepairExtractor(base_extractor, max_retries=max_repair_retries)
 
     def run(
@@ -58,14 +58,14 @@ class PTextAnswer:
         t0 = time.perf_counter()
 
         # Stage 1: Retrieve
-        bm25 = index_manager.get_or_build("bm25", units, BM25Retriever(), {})
+        bm25 = index_manager.get_or_build("bm25", units, BM25Retriever(), {}, dataset_id=dataset_id)
         if self.retriever_type == "bm25":
             retrieved = bm25.search(query_text, top_k=self.top_k)
         elif self.retriever_type == "dense":
-            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {}, dataset_id=dataset_id)
             retrieved = dense.search(query_text, top_k=self.top_k)
         else:
-            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {}, dataset_id=dataset_id)
             hybrid = HybridRetriever(bm25, dense)
             hybrid.units = units
             retrieved = hybrid.search(query_text, top_k=self.top_k)

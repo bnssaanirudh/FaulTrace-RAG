@@ -1,0 +1,54 @@
+{
+  "cik": 320193,
+  "entityName": "Apple Inc.",
+  "facts": {
+    "us-gaap": {
+      "Revenues": {
+        "label": "Revenues",
+        "description": "Amount of revenue recognized from goods sold, services rendered...",
+        "units": {
+          "USD": [
+            {
+              "end": "2023-09-30",
+              "val": 383285000000,
+              "accn": "0000320193-23-000106",
+              "fy": 2023,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2023-11-03",
+              "frame": "CY2023"
+            },
+            {
+              "end": "2022-09-24",
+              "val": 394328000000,
+              "accn": "0000320193-22-000108",
+              "fy": 2022,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2022-10-28",
+              "frame": "CY2022"
+            }
+          ]
+        }
+      },
+      "Assets": {
+        "label": "Assets",
+        "description": "Sum of the carrying amounts as of the balance sheet date of all assets...",
+        "units": {
+          "USD": [
+            {
+              "end": "2023-09-30",
+              "val": 352583000000,
+              "accn": "0000320193-23-000106",
+              "fy": 2023,
+              "fp": "FY",
+              "form": "10-K",
+              "filed": "2023-11-03",
+              "frame": "CY2023I"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

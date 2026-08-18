@@ -19,9 +19,7 @@ Usage:
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
-from typing import Optional
 
 import typer
 
@@ -52,8 +50,9 @@ app.add_typer(experiment_app, name="experiment")
 @experiment_app.command("validate")
 def validate_experiment(config: Path = typer.Argument(..., help="Path to experiment config JSON")):
     """Validate a YAML/JSON experiment specification."""
-    from faulttrace_reporting import ExperimentSpec
     import json
+
+    from faulttrace_reporting import ExperimentSpec
     if not config.exists():
         typer.echo(f"[ERROR] Config file not found: {config}", err=True)
         raise typer.Exit(1)
@@ -68,8 +67,9 @@ def validate_experiment(config: Path = typer.Argument(..., help="Path to experim
 @experiment_app.command("plan")
 def plan_experiment(config: Path = typer.Argument(..., help="Path to experiment config JSON")):
     """Plan experiment matrix and estimate resource usage."""
-    from faulttrace_reporting import ExperimentSpec, ResumableMatrixRunner
     import json
+
+    from faulttrace_reporting import ExperimentSpec, ResumableMatrixRunner
     if not config.exists():
         typer.echo(f"[ERROR] Config file not found: {config}", err=True)
         raise typer.Exit(1)
@@ -77,7 +77,7 @@ def plan_experiment(config: Path = typer.Argument(..., help="Path to experiment 
         spec = ExperimentSpec.model_validate(json.loads(config.read_text()))
         runner = ResumableMatrixRunner(spec)
         plan = runner.dry_run()
-        typer.echo(f"--- Experiment Execution Plan ---")
+        typer.echo("--- Experiment Execution Plan ---")
         typer.echo(f"Config Hash: {plan['config_hash']}")
         typer.echo(f"Total Jobs to Execute: {plan['total_jobs']}")
         typer.echo(f"Estimated Tokens Input: {plan['estimated_input_tokens']:,}")
@@ -90,8 +90,9 @@ def plan_experiment(config: Path = typer.Argument(..., help="Path to experiment 
 @experiment_app.command("run")
 def run_experiment(config: Path = typer.Argument(..., help="Path to experiment config JSON")):
     """Execute the experiment matrix runs."""
-    from faulttrace_reporting import ExperimentSpec, ResumableMatrixRunner
     import json
+
+    from faulttrace_reporting import ExperimentSpec, ResumableMatrixRunner
     if not config.exists():
         typer.echo(f"[ERROR] Config file not found: {config}", err=True)
         raise typer.Exit(1)
@@ -111,10 +112,11 @@ def run_experiment(config: Path = typer.Argument(..., help="Path to experiment c
 @experiment_app.command("resume")
 def resume_experiment(experiment_id: str = typer.Argument(..., help="Experiment ID (Config Hash) to resume")):
     """Resume a previously interrupted experiment matrix."""
+    import json
+
     from faulttrace_api.database import ExperimentRow, get_session_factory
     from faulttrace_reporting import ExperimentSpec, ResumableMatrixRunner
-    import json
-    
+
     db = get_session_factory()()
     exp = db.query(ExperimentRow).filter(ExperimentRow.experiment_id == experiment_id).first()
     if not exp:
@@ -134,13 +136,24 @@ def resume_experiment(experiment_id: str = typer.Argument(..., help="Experiment 
 @experiment_app.command("summarize")
 def summarize_experiment(experiment_id: str = typer.Argument(..., help="Experiment ID to summarize")):
     """Compute aggregate metrics, confidence intervals, compile reports & export bundles."""
-    import pandas as pd
-    from faulttrace_api.database import ExperimentRow, RunRow, QueryRow, WorldRow, get_session_factory
-    from faulttrace_reporting import (
-        ExperimentSpec, MetricsComputer, FigureGenerator, ReportGenerator, ReproducibilityBundle
-    )
     import json
-    
+
+    import pandas as pd
+    from faulttrace_api.database import (
+        ExperimentRow,
+        QueryRow,
+        RunRow,
+        WorldRow,
+        get_session_factory,
+    )
+    from faulttrace_reporting import (
+        ExperimentSpec,
+        FigureGenerator,
+        MetricsComputer,
+        ReportGenerator,
+        ReproducibilityBundle,
+    )
+
     db = get_session_factory()()
     exp = db.query(ExperimentRow).filter(ExperimentRow.experiment_id == experiment_id).first()
     if not exp:
@@ -150,7 +163,7 @@ def summarize_experiment(experiment_id: str = typer.Argument(..., help="Experime
     try:
         spec = ExperimentSpec.model_validate(json.loads(exp.config_json))
         run_rows = db.query(RunRow).filter(RunRow.experiment_id == experiment_id).all()
-        
+
         runs_list = []
         for r in run_rows:
             # Query scale_n via query -> world association
@@ -261,7 +274,7 @@ def seed_data(
         help="Directory for generated data",
     ),
     fixtures: bool = typer.Option(True, "--fixtures/--no-fixtures", help="Also generate adversarial fixtures"),
-    register_db: Optional[str] = typer.Option(
+    register_db: str | None = typer.Option(
         None, "--register-db", help="SQLite DB path to register worlds (optional)"
     ),
 ) -> None:
@@ -323,11 +336,11 @@ def ingest_amazon(
         "--output",
         help="Root directory for canonical Parquet output",
     ),
-    data_root: Optional[Path] = typer.Option(
+    data_root: Path | None = typer.Option(
         None, "--data-root", help="Project data root for path fingerprinting (default: output parent)"
     ),
     license_note: str = typer.Option("", "--license-note", help="License/provenance note"),
-    register_db: Optional[str] = typer.Option(None, "--register-db", help="SQLite DB to register snapshot"),
+    register_db: str | None = typer.Option(None, "--register-db", help="SQLite DB to register snapshot"),
     max_bytes_mb: int = typer.Option(500, "--max-bytes-mb", help="Max uncompressed size limit (MB)"),
 ) -> None:
     """Ingest a local Amazon-style file into a canonical Parquet snapshot."""
@@ -529,6 +542,7 @@ def verify_nested(
 ) -> None:
     """Cryptographically verify nestedness for a world group."""
     import json
+
     from faulttrace_data.world_builder import WorldManifestV2
 
     # Find all manifests for this group
@@ -578,6 +592,7 @@ def summarize_world(
 ) -> None:
     """Show summary statistics for a world."""
     import json
+
     from faulttrace_data.world_builder import WorldBuilder, WorldManifestV2
 
     manifest_path = output_dir / world_id / "manifest.json"
@@ -637,7 +652,7 @@ def generate_queries(
     data_dir: Path = typer.Option(Path("data/generated"), "--data-dir"),
     count: int = typer.Option(60, "--count", help="Target number of queries to generate"),
     output_dir: Path = typer.Option(Path("artifacts/queries"), "--output-dir"),
-    register_db: Optional[str] = typer.Option(None, "--register-db"),
+    register_db: str | None = typer.Option(None, "--register-db"),
 ) -> None:
     """Generate procedural queries for a corpus world."""
     from faulttrace_pipelines.query_factory import QueryFactory
@@ -672,7 +687,7 @@ def build_query_pack(
     release: bool = typer.Option(False, "--release", help="Mark pack as gold_ready (requires zero disagreements)"),
 ) -> None:
     """Build a research benchmark pack with balanced queries across families and splits."""
-    from faulttrace_pipelines.query_factory import QueryFactory, BenchmarkPack
+    from faulttrace_pipelines.query_factory import QueryFactory
 
     typer.echo(f"[faulttrace query pack] world_id={world_id}, count={count}")
 

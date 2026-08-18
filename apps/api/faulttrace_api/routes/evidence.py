@@ -21,14 +21,15 @@ from faulttrace_core.evidence import (
 )
 from faulttrace_core.extraction_providers import (
     BoundedRepairExtractor,
-    DeterministicFixtureExtractor,
+    get_default_extractor,
 )
 from faulttrace_core.knowledge_graph import ProvenanceGraph
 from pydantic import BaseModel, Field
 
 router = APIRouter(tags=["evidence"])
 
-GRAPH_ARTIFACTS_DIR = Path("artifacts/graphs")
+ARTIFACTS_DIR = Path("artifacts")
+GRAPH_ARTIFACTS_DIR = ARTIFACTS_DIR / "graphs"
 
 
 # ---------------------------------------------------------------------------
@@ -117,10 +118,8 @@ def extract_evidence(req: ExtractRequest) -> ExtractResponse:
     """
     Run deterministic extraction on a single document and return structured evidence.
 
-    Uses DeterministicFixtureExtractor wrapped in BoundedRepairExtractor.
-    If OPENAI_API_KEY is set in the environment, uses SchemaConstrainedLLMExtractor instead.
     """
-    base = DeterministicFixtureExtractor()
+    base = get_default_extractor()
     extractor = BoundedRepairExtractor(base, max_retries=req.max_repair_retries)
 
     try:
@@ -215,15 +214,21 @@ def get_provenance_graph(graph_id: str) -> GraphResponse:
 
     if not graph_path.exists():
         # Try subdirectories (benchmark_runs, text_runs)
+        parts = graph_id.split("_", 1)
+        query_id = parts[1] if len(parts) == 2 else graph_id
         for subdir in ["benchmark_runs", "text_runs"]:
-            alt = Path("artifacts") / subdir / f"graph_{graph_id}.json"
-            if alt.exists():
-                graph_path = alt
+            alt_new = ARTIFACTS_DIR / subdir / f"graph_{graph_id}.json"
+            alt_old = ARTIFACTS_DIR / subdir / f"graph_{query_id}.json"
+            if alt_new.exists():
+                graph_path = alt_new
+                break
+            elif alt_old.exists():
+                graph_path = alt_old
                 break
         else:
             raise HTTPException(
                 status_code=404,
-                detail=f"Provenance graph '{graph_id}' not found. "
+                detail=f"Provenance graph '{graph_id}' not found. Expected filename: artifacts/text_runs/graph_{graph_id}.json. "
                 f"Run a text pipeline first to generate graphs.",
             )
 

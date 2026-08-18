@@ -13,13 +13,19 @@ class IndexManager:
         self._cache: dict[str, RetrievalEngine] = {}
 
     def _generate_key(
-        self, units: list[RetrievalUnit], engine_type: str, config: dict[str, Any]
+        self, units: list[RetrievalUnit], engine_type: str, config: dict[str, Any], dataset_id: str | None = None
     ) -> str:
         """Generate a stable hash based on corpus contents and index configuration."""
         # We hash the unit IDs and their lengths as a proxy for corpus state
         corpus_signature = [(u.unit_id, len(u.text)) for u in units]
         # Sort to ensure order independence if needed, but normally order is stable
-        state = {"engine_type": engine_type, "config": config, "corpus_signature": corpus_signature}
+        state = {
+            "engine_type": engine_type,
+            "config": config,
+            "dataset_id": dataset_id,
+            "corpus_signature": corpus_signature,
+            "num_docs": len(units),
+        }
         state_str = json.dumps(state, sort_keys=True)
         return hashlib.sha256(state_str.encode("utf-8")).hexdigest()
 
@@ -29,12 +35,13 @@ class IndexManager:
         units: list[RetrievalUnit],
         engine_instance: RetrievalEngine,
         config: dict[str, Any],
+        dataset_id: str | None = None,
     ) -> RetrievalEngine:
         """
         Retrieves a cached engine if the corpus and config match exactly.
         Otherwise, builds the index on the provided instance and caches it.
         """
-        cache_key = self._generate_key(units, engine_type, config)
+        cache_key = self._generate_key(units, engine_type, config, dataset_id=dataset_id)
 
         if cache_key in self._cache:
             return self._cache[cache_key]

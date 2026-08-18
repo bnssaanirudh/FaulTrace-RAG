@@ -1,0 +1,53 @@
+{
+  "name": "demo_matrix",
+  "dataset_id": "amazon_demo",
+  "scales": [
+    10,
+    50
+  ],
+  "query_families": [
+    "count",
+    "mean",
+    "proportion",
+    "comparison",
+    "top_k",
+    "trend"
+  ],
+  "difficulty_strata": [
+    "easy",
+    "medium",
+    "adversarial"
+  ],
+  "pipelines": [
+    "P0-deterministic-scope-baseline",
+    "P1-wrong-scope",
+    "P2-wrong-facts",
+    "P3-wrong-aggregation",
+    "P4-compound-scope-facts",
+    "P5-full-compound"
+  ],
+  "providers": [
+    "deterministic"
+  ],
+  "models": [
+    "gpt-4o-mini"
+  ],
+  "retriever": "bm25",
+  "top_k": 10,
+  "chunk_size": 500,
+  "context_budget": 4000,
+  "batch_size": 10,
+  "repair_policy": "strict_exact_v1",
+  "certificate_policy": "strict_exact_v1",
+  "seeds": [
+    42
+  ],
+  "timeout_seconds": 30.0,
+  "retries": 3,
+  "cache_policy": "use_cache",
+  "output_root": "artifacts/experiments",
+  "tags": [
+    "demo",
+    "engineering_validation"
+  ]
+}

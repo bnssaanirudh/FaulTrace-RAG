@@ -248,7 +248,6 @@ class SchemaConstrainedLLMExtractor(ExtractionProvider):
     def __init__(self, model: str = "gpt-4o-mini", temperature: float = 0.0):
         self.model = model
         self.temperature = temperature
-        self._fallback = DeterministicFixtureExtractor()
         self._client = self._build_client()
 
     def _build_client(self):
@@ -266,13 +265,11 @@ class SchemaConstrainedLLMExtractor(ExtractionProvider):
 
     @property
     def provider_name(self) -> str:
-        if self._client:
-            return f"openai_{self.model}"
-        return "deterministic_fixture_fallback"
+        return f"openai_{self.model}"
 
     @property
     def model_version(self) -> str | None:
-        return self.model if self._client else "1.0.0"
+        return self.model
 
     def extract(
         self,
@@ -285,16 +282,7 @@ class SchemaConstrainedLLMExtractor(ExtractionProvider):
         metadata: dict[str, Any] | None = None,
     ) -> ExtractionRecord:
         if self._client is None:
-            # No API key — use deterministic fallback transparently
-            return self._fallback.extract(
-                doc_id=doc_id,
-                doc_text=doc_text,
-                query=query,
-                dataset_id=dataset_id,
-                split=split,
-                chunk_id=chunk_id,
-                metadata=metadata,
-            )
+            raise RuntimeError("EXTRACTION_PROVIDER=openai but OPENAI_API_KEY is not set.")
 
         self._get_output_schema()
         prompt = self._build_prompt(query, doc_text)
@@ -318,18 +306,9 @@ class SchemaConstrainedLLMExtractor(ExtractionProvider):
                 parsed, doc_id, doc_text, query, dataset_id, split, chunk_id
             )
 
-        except Exception:
-            # Any LLM failure → fall back to deterministic
-            return self._fallback.extract(
-                doc_id=doc_id,
-                doc_text=doc_text,
-                query=query,
-                dataset_id=dataset_id,
-                split=split,
-                chunk_id=chunk_id,
-                metadata=metadata,
-            )
-
+        except Exception as e:
+            # Any LLM failure
+            raise e
     def _build_prompt(self, query: str, doc_text: str) -> str:
         return f"""Given the following document and query, extract facts and assess whether the document supports the query claim.
 
@@ -377,6 +356,10 @@ Return a JSON object with these fields:
         split: str,
         chunk_id: str | None,
     ) -> ExtractionRecord:
+        supporting_quote = parsed.get("supporting_quote")
+        if supporting_quote is not None and supporting_quote not in doc_text:
+            raise ValueError("Extracted supporting_quote is not an exact substring of the source document.")
+
         status_str = parsed.get("support_status", "insufficient_evidence")
         try:
             support_status = SupportStatus(status_str)
@@ -562,3 +545,10 @@ class BoundedRepairExtractor(ExtractionProvider):
                 "repair_log": [a.to_dict() for a in self.repair_log],
             },
         )
+
+def get_default_extractor() -> ExtractionProvider:
+    import os
+    provider = os.getenv("EXTRACTION_PROVIDER", "deterministic").lower()
+    if provider == "openai":
+        return SchemaConstrainedLLMExtractor()
+    return DeterministicFixtureExtractor()

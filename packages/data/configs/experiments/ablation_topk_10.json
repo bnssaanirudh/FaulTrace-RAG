@@ -1,0 +1,41 @@
+{
+  "name": "ablation_topk_10",
+  "dataset_id": "amazon_demo",
+  "scales": [
+    200
+  ],
+  "query_families": [
+    "top_k",
+    "count"
+  ],
+  "difficulty_strata": [
+    "medium"
+  ],
+  "pipelines": [
+    "P4-compound-scope-facts"
+  ],
+  "providers": [
+    "deterministic"
+  ],
+  "models": [
+    "gpt-4o-mini"
+  ],
+  "retriever": "bm25",
+  "top_k": 10,
+  "chunk_size": 500,
+  "context_budget": 4000,
+  "batch_size": 10,
+  "repair_policy": "strict_exact_v1",
+  "certificate_policy": "strict_exact_v1",
+  "seeds": [
+    42
+  ],
+  "timeout_seconds": 30.0,
+  "retries": 3,
+  "cache_policy": "use_cache",
+  "output_root": "artifacts/experiments",
+  "tags": [
+    "ablation",
+    "top_k"
+  ]
+}

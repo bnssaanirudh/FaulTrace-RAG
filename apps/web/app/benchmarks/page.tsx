@@ -10,21 +10,21 @@ export default function BenchmarksPage() {
       title: "SciFact",
       description: "Scientific fact checking corpus (BEIR format). Contains claims with corresponding abstracts.",
       stats: { docs: "5,183", queries: "300" },
-      status: "Available"
+      status: "Supported"
     },
     {
       id: "hotpotqa",
       title: "HotpotQA",
       description: "Multi-hop question answering dataset.",
       stats: { docs: "Large", queries: "7,405" },
-      status: "Available (Distractor)"
+      status: "Planned"
     },
     {
       id: "covidqa",
       title: "COVID-QA (RAGBench)",
       description: "Question answering about COVID-19 related scientific articles.",
       stats: { docs: "Varies", queries: "Varies" },
-      status: "Partial Integration"
+      status: "Pending"
     }
   ]
 
@@ -41,7 +41,7 @@ export default function BenchmarksPage() {
             <div className="mb-4">
               <div className="flex justify-between items-start">
                 <h2 className="text-xl font-semibold">{b.title}</h2>
-                <Badge variant={b.status.includes("Available") ? "brand" : "neutral"}>
+                <Badge variant={b.status === "Supported" ? "brand" : "neutral"}>
                   {b.status}
                 </Badge>
               </div>

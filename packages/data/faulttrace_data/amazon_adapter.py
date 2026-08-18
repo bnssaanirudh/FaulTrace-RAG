@@ -36,23 +36,22 @@ from __future__ import annotations
 import csv
 import gzip
 import hashlib
-import io
 import json
 import logging
 import re
-from datetime import datetime, timezone
+from collections.abc import Generator
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Generator, Iterator, Optional
-from uuid import uuid4
+from typing import Any
 
 import orjson
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
+from faulttrace_core.models import CorpusRecord, RecordCategory
+from faulttrace_data.snapshot_registry import DatasetSnapshot
 from pydantic import BaseModel, Field
-
-from faulttrace_core.models import CorpusRecord, RecordCategory, SCHEMA_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -141,9 +140,9 @@ class IngestionReport(BaseModel):
     malformed_count: int = 0
     null_counts: dict[str, int] = Field(default_factory=dict)
     rejection_reasons: dict[str, int] = Field(default_factory=dict)
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
-    parquet_output_path: Optional[str] = None
-    rejected_artifact_path: Optional[str] = None
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    parquet_output_path: str | None = None
+    rejected_artifact_path: str | None = None
 
     def log_rejection(self, record_id: str, reason: str) -> None:
         """Log a rejection reason without exposing raw text."""
@@ -161,7 +160,7 @@ class IngestionReport(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _normalize_category(raw: Any) -> Optional[RecordCategory]:
+def _normalize_category(raw: Any) -> RecordCategory | None:
     """Normalize a raw category string to RecordCategory. Returns None if unknown."""
     if raw is None:
         return None
@@ -169,7 +168,7 @@ def _normalize_category(raw: Any) -> Optional[RecordCategory]:
     return _CATEGORY_MAP.get(normalized)
 
 
-def _parse_timestamp(raw: Any, field_name: str = "timestamp") -> Optional[datetime]:
+def _parse_timestamp(raw: Any, field_name: str = "timestamp") -> datetime | None:
     """
     Parse a timestamp from various formats. Always produces UTC datetime.
     Returns None on failure (caller decides to reject or quarantine).
@@ -179,7 +178,7 @@ def _parse_timestamp(raw: Any, field_name: str = "timestamp") -> Optional[dateti
     if isinstance(raw, (int, float)):
         # Unix epoch
         try:
-            return datetime.fromtimestamp(raw, tz=timezone.utc)
+            return datetime.fromtimestamp(raw, tz=UTC)
         except (ValueError, OSError):
             return None
     s = str(raw).strip()
@@ -196,14 +195,14 @@ def _parse_timestamp(raw: Any, field_name: str = "timestamp") -> Optional[dateti
         try:
             dt = datetime.strptime(s, fmt)
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=timezone.utc)
+                dt = dt.replace(tzinfo=UTC)
             return dt
         except ValueError:
             continue
     return None
 
 
-def _parse_price(raw: Any) -> Optional[Decimal]:
+def _parse_price(raw: Any) -> Decimal | None:
     """Parse price from string, float, or int. Returns None if missing/invalid."""
     if raw is None:
         return None
@@ -219,7 +218,7 @@ def _parse_price(raw: Any) -> Optional[Decimal]:
         return None
 
 
-def _parse_rating(raw: Any) -> Optional[float]:
+def _parse_rating(raw: Any) -> float | None:
     """Parse and validate rating [1.0, 5.0]. Returns None if invalid."""
     if raw is None:
         return None
@@ -250,7 +249,7 @@ class RowParser:
         self.dataset_id = dataset_id
         self.world_id = world_id
 
-    def parse(self, row: dict[str, Any], row_index: int) -> tuple[Optional[CorpusRecord], Optional[str]]:
+    def parse(self, row: dict[str, Any], row_index: int) -> tuple[CorpusRecord | None, str | None]:
         """
         Parse row into (CorpusRecord, None) on success, or (None, rejection_reason) on failure.
         """
@@ -415,7 +414,7 @@ def _stream_jsonl_gz(path: Path, max_bytes: int = MAX_UNCOMPRESSED_BYTES) -> Gen
 def _stream_csv(path: Path, max_bytes: int = MAX_UNCOMPRESSED_BYTES) -> Generator[dict[str, Any], None, None]:
     """Stream rows from CSV file."""
     bytes_read = 0
-    with open(path, "r", encoding="utf-8", errors="replace", newline="") as f:
+    with open(path, encoding="utf-8", errors="replace", newline="") as f:
         reader = csv.DictReader(f)
         for row in reader:
             row_bytes = sum(len(str(v)) for v in row.values())
@@ -473,7 +472,7 @@ class AmazonLocalAdapter:
     def __init__(
         self,
         dataset_id: str,
-        field_mapping: Optional[AmazonFieldMapping] = None,
+        field_mapping: AmazonFieldMapping | None = None,
         max_bytes: int = MAX_UNCOMPRESSED_BYTES,
         chunk_size: int = CHUNK_SIZE,
     ):
@@ -486,13 +485,13 @@ class AmazonLocalAdapter:
         self,
         source_path: Path,
         output_root: Path,
-        data_root: Optional[Path] = None,
-        snapshot_id: Optional[str] = None,
+        data_root: Path | None = None,
+        snapshot_id: str | None = None,
         license_note: str = "",
-        producing_command: Optional[str] = None,
+        producing_command: str | None = None,
         partition_by_category: bool = False,
         partition_by_year: bool = False,
-    ) -> tuple[IngestionReport, "DatasetSnapshot"]:
+    ) -> tuple[IngestionReport, DatasetSnapshot]:
         """
         Stream-ingest source_path → canonical Parquet + ingestion report.
 
@@ -623,7 +622,7 @@ class AmazonLocalAdapter:
         report.parquet_output_path = str(out_dir)
 
         # Compute canonical hash of output directory
-        from faulttrace_data.snapshot import _hash_directory, MissingnessSummary
+        from faulttrace_data.snapshot import _hash_directory
         canonical_hash = _hash_directory(out_dir) if out_dir.exists() else ""
 
         # Compute source file hash
