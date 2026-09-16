@@ -16,7 +16,6 @@ component at a time:
 
 from __future__ import annotations
 
-import random
 import time
 from pathlib import Path
 from typing import Any
@@ -32,7 +31,7 @@ from faulttrace_gold.pandas_engine import PandasEvaluator
 
 from faulttrace_pipelines.base import AbstractPipeline
 from faulttrace_pipelines.p1_wrong_scope import _perturb_predicate
-from faulttrace_pipelines.p2_wrong_facts import _corrupt_dataframe
+from faulttrace_pipelines.p2_wrong_facts import _corrupt_dataframe, _overlay_corrupted_fields
 from faulttrace_pipelines.p3_wrong_aggregation import _corrupt_answer
 
 PIPELINE_ID = "P5-full-compound"
@@ -52,6 +51,16 @@ class P5FullCompound(AbstractPipeline):
     pipeline_id = PIPELINE_ID
     provider_id = PROVIDER_ID
 
+    def replay_extraction(self, query: QuerySpec, scoped_df: pd.DataFrame) -> list[dict[str, Any]]:
+        rng = self.fault_rng(query, "facts")
+        fields = query.fact_spec.fields
+        fact_df = _eval.extract_facts(query.fact_spec, scoped_df)
+        return _corrupt_dataframe(fact_df, fields, rng).to_dict(orient="records")
+
+    def replay_aggregation(self, query: QuerySpec, extracted_rows: list[dict[str, Any]]) -> Any:
+        correct_answer = super().replay_aggregation(query, extracted_rows)
+        return _corrupt_answer(correct_answer, query, self.fault_rng(query, "aggregation"))
+
     def _execute(
         self,
         run_id: str,
@@ -62,7 +71,9 @@ class P5FullCompound(AbstractPipeline):
     ) -> tuple[Any, list, list, int, int]:
         events: list = []
         components: list = []
-        rng = random.Random(str(query.query_id))
+        scope_rng = self.fault_rng(query, "scope")
+        facts_rng = self.fault_rng(query, "facts")
+        aggregation_rng = self.fault_rng(query, "aggregation")
 
         events.append(
             self._make_event(
@@ -76,7 +87,7 @@ class P5FullCompound(AbstractPipeline):
 
         # ── Stage 2: scope (FAULTY) ──
         t1 = time.perf_counter()
-        wrong_pred = _perturb_predicate(query.scope_predicate, rng)
+        wrong_pred = _perturb_predicate(query.scope_predicate, scope_rng)
         try:
             mask = compiler.to_pandas_mask(wrong_pred, df)
             scope_df = df[mask].copy()
@@ -105,8 +116,9 @@ class P5FullCompound(AbstractPipeline):
         t2 = time.perf_counter()
         fields = query.fact_spec.fields
         avail = [f for f in fields if f in scope_df.columns]
-        raw_extraction = scope_df[avail].copy() if avail else scope_df.copy()
-        corrupted_df = _corrupt_dataframe(raw_extraction, avail, rng)
+        lineage_fields = (["record_id"] if "record_id" in scope_df.columns else []) + avail
+        raw_extraction = scope_df[list(dict.fromkeys(lineage_fields))].copy()
+        corrupted_df = _corrupt_dataframe(raw_extraction, avail, facts_rng)
 
         events.append(
             self._make_event(
@@ -126,17 +138,14 @@ class P5FullCompound(AbstractPipeline):
 
         # ── Stage 4: aggregate (FAULTY — compute then corrupt) ──
         t3 = time.perf_counter()
-        eval_df = df.copy()
-        for col in corrupted_df.columns:
-            if col in eval_df.columns and col not in ("record_id", "world_id"):
-                eval_df.loc[corrupted_df.index, col] = corrupted_df[col].values
+        eval_df = _overlay_corrupted_fields(df, corrupted_df)
 
         wrong_query = query.model_copy(update={"scope_predicate": wrong_pred})
         intermediate = _eval.evaluate(wrong_query, eval_df)
         intermediate_answer = intermediate.get("result")
 
         # Now corrupt the aggregation output too
-        answer_value = _corrupt_answer(intermediate_answer, query, rng)
+        answer_value = _corrupt_answer(intermediate_answer, query, aggregation_rng)
 
         events.append(
             self._make_event(

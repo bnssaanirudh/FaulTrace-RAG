@@ -280,12 +280,15 @@ async def get_run_attribution(run_id: str, db: Session = Depends(get_db)):
     )
 
     attributor = CounterfactualAttributor()
-    result = attributor.attribute(
-        parent_run=parent_run,
-        query=query_spec,
-        gold_answer_obj=gold,
-        oracle_df=df,
-    )
+    try:
+        result = attributor.attribute(
+            parent_run=parent_run,
+            query=query_spec,
+            gold_answer_obj=gold,
+            oracle_df=df,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     return result.to_dict()
 
@@ -376,13 +379,13 @@ async def get_leaderboard(db: Session = Depends(get_db)):
     """
     Aggregate pipeline runs into a leaderboard with accuracy and mean loss per pipeline.
     """
-    from sqlalchemy import func
+    from sqlalchemy import Integer, func
 
     rows = (
         db.query(
             RunRow.pipeline_id,
             func.count(RunRow.run_id).label("total"),
-            func.avg(RunRow.is_correct.cast(type_=bool)).label("accuracy"),
+            func.avg(RunRow.is_correct.cast(Integer)).label("accuracy"),
             func.avg(RunRow.loss).label("mean_loss"),
             func.avg(RunRow.latency_ms).label("mean_latency_ms"),
         )

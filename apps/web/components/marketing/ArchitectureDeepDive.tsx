@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Database, Search, Cpu, FileText, BarChart3 } from 'lucide-react';
+import { Database, Cpu, BarChart3 } from 'lucide-react';
 
 export function ArchitectureDeepDive() {
   const steps = [

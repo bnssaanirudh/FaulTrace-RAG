@@ -1,36 +1,48 @@
-import os
-import time
+"""Summarize measured, provenance-complete experiment performance records."""
+
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+import pandas as pd
 
 
-def run_benchmarks():
-    print("Starting FaultTrace-RAG Performance Benchmarking...")
+def summarize(input_path: Path, output_path: Path) -> None:
+    if not input_path.exists():
+        raise FileNotFoundError(f"Measured experiment CSV not found: {input_path}")
+    frame = pd.read_csv(input_path)
+    required = {"experiment_config_hash", "dataset_id", "pipeline_id", "scale_n", "latency_ms"}
+    missing = required - set(frame.columns)
+    if missing:
+        raise ValueError(f"Input is not a measured provenance-complete export; missing {sorted(missing)}")
 
-    # Simulate benchmarking RAG pipelines on standard environments
-    results = [
-        {"pipeline": "P1_BM25_Generative", "scale": 10, "latency_ms": 45, "memory_mb": 120},
-        {"pipeline": "P1_BM25_Generative", "scale": 50, "latency_ms": 65, "memory_mb": 150},
-        {"pipeline": "P2_Dense_Generative", "scale": 10, "latency_ms": 120, "memory_mb": 400},
-        {"pipeline": "P2_Dense_Generative", "scale": 50, "latency_ms": 185, "memory_mb": 420},
-        {"pipeline": "P4_Compound_MER", "scale": 10, "latency_ms": 240, "memory_mb": 512},
-        {"pipeline": "P4_Compound_MER", "scale": 50, "latency_ms": 310, "memory_mb": 600},
-        {"pipeline": "P5_Certified_Repair", "scale": 10, "latency_ms": 1200, "memory_mb": 1024},
-        {"pipeline": "P5_Certified_Repair", "scale": 50, "latency_ms": 2500, "memory_mb": 1400},
-    ]
+    aggregations = {
+        "runs": ("latency_ms", "count"),
+        "mean_latency_ms": ("latency_ms", "mean"),
+        "p50_latency_ms": ("latency_ms", "median"),
+        "p95_latency_ms": ("latency_ms", lambda values: values.quantile(0.95)),
+    }
+    if "peak_memory_mb" in frame.columns:
+        aggregations["mean_peak_memory_mb"] = ("peak_memory_mb", "mean")
+    summary = frame.groupby(["dataset_id", "pipeline_id", "scale_n"], dropna=False).agg(
+        **aggregations
+    ).reset_index()
 
-    time.sleep(1)  # simulate work
-
-    report_path = os.path.join(os.path.dirname(__file__), "..", "reports", "benchmark_results.md")
-    os.makedirs(os.path.dirname(report_path), exist_ok=True)
-
-    with open(report_path, "w") as f:
-        f.write("# FaultTrace-RAG Performance Benchmarks\n\n")
-        f.write("| Pipeline | Scale N | Latency (ms) | Memory (MB) |\n")
-        f.write("|----------|---------|--------------|-------------|\n")
-        for r in results:
-            f.write(f"| {r['pipeline']} | {r['scale']} | {r['latency_ms']} | {r['memory_mb']} |\n")
-
-    print(f"Benchmarking complete. Results written to {report_path}")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(output_path.with_suffix(".csv"), index=False)
+    output_path.write_text(
+        "# FaultTrace-RAG Measured Performance Summary\n\n"
+        + f"Source: `{input_path}`\n\n"
+        + summary.to_markdown(index=False)
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 if __name__ == "__main__":
-    run_benchmarks()
+    parser = argparse.ArgumentParser()
+    parser.add_argument("input", type=Path, help="Provenance-complete measured experiment CSV")
+    parser.add_argument("--output", type=Path, default=Path("reports/benchmark_results.md"))
+    args = parser.parse_args()
+    summarize(args.input, args.output)

@@ -40,7 +40,7 @@ class GoldAgreementResult:
     gold_answer: GoldAnswer | None = None
 
 
-def _results_agree(
+def results_agree(
     a: Any,
     b: Any,
     tolerance: float = 1e-6,
@@ -50,16 +50,16 @@ def _results_agree(
         return True
     if a is None or b is None:
         return False
-    if isinstance(a, (int, float)) and isinstance(b, (int, float)):
+    if isinstance(a, int | float) and isinstance(b, int | float):
         return abs(float(a) - float(b)) <= tolerance
     if isinstance(a, list) and isinstance(b, list):
         if len(a) != len(b):
             return False
-        return all(_results_agree(x, y, tolerance) for x, y in zip(a, b, strict=False))
+        return all(results_agree(x, y, tolerance) for x, y in zip(a, b, strict=False))
     if isinstance(a, dict) and isinstance(b, dict):
         if set(a.keys()) != set(b.keys()):
             return False
-        return all(_results_agree(a[k], b[k], tolerance) for k in a)
+        return all(results_agree(a[k], b[k], tolerance) for k in a)
     # String/categorical comparison
     # Handle Enum instances to match raw string outputs from duckdb
     if isinstance(a, Enum):
@@ -67,6 +67,11 @@ def _results_agree(
     if isinstance(b, Enum):
         b = b.value
     return str(a) == str(b)
+
+
+# Backward-compatible alias for existing callers. New code should use the
+# public name so comparison behavior has a single, documented entry point.
+_results_agree = results_agree
 
 
 class GoldValidator:
@@ -115,7 +120,7 @@ class GoldValidator:
             dk_error = None
 
         # Check agreement
-        agreed = _results_agree(pd_value, dk_value, query.tolerance)
+        agreed = results_agree(pd_value, dk_value, query.tolerance)
 
         if pd_error or dk_error:
             status = AgreementStatus.SINGLE_ENGINE

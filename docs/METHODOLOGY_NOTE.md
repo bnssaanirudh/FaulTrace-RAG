@@ -79,9 +79,9 @@ Weights are derived from the uniform distribution over orderings of 3 elements:
 
 ---
 
-## 5. Interaction Term
+## 5. Efficiency Residual
 
-The interaction term captures error that is not attributable to any single component:
+For an exact Shapley decomposition over the complete lattice, efficiency requires:
 
 ```
 interaction = v(REA) - (φ_R + φ_E + φ_A)
@@ -92,10 +92,10 @@ interaction = v(REA) - (φ_R + φ_E + φ_A)
 φ_R + φ_E + φ_A + interaction = v(REA) = total_recoverable_error
 ```
 
-The interaction term:
-- **Positive**: Sub-additive effect — components independently recover more than they do together
-- **Negative**: Super-additive effect — components are complementary (fixing one alone helps more than fixing two together separately)
-- **Zero**: All error is cleanly decomposable into individual component contributions
+The retained `interaction` field is a backward-compatible numerical residual. It should be
+zero up to floating-point tolerance for every complete valid lattice and must not be
+interpreted as a separately identified higher-order interaction. Pairwise or higher-order
+interactions require an explicit interaction index and are not estimated here.
 
 ---
 
@@ -123,7 +123,10 @@ Absolute value is used because a strongly negative phi (harmful oracle) is just 
 
 ## 8. Invalid Interventions
 
-When an intervention cannot be evaluated (e.g. missing artifact, missing parent extraction), the subset returns `status="invalid"` and `v(S) = 0.0`. Invalid interventions do NOT generate a negative Shapley value — they contribute nothing to the attribution. The `natural_language_summary` field records the specific reason for invalidity.
+When an intervention cannot be evaluated (for example, because a required parent artifact
+is absent), the subset returns `status="invalid"`. The attribution engine rejects the
+entire lattice and reports the reasons. It does not replace invalid interventions with
+zeros, because doing so would silently bias the Shapley values.
 
 ---
 
@@ -136,14 +139,52 @@ Components in text benchmarks:
 - **E**: Which facts/spans are extracted from those documents
 - **A**: How facts are assembled into the final `SupportStatus` assessment
 
+The external SciFact audit instantiates this lattice with deterministic providers. Its
+injected-fault labels are generated independently of the attribution calculation, and
+all eight interventions are executed before Shapley scoring. This validates lattice
+execution and fault-localization mechanics; it is not evidence that a learned extractor
+or an LLM can recover the same interventions on unrestricted text.
+
 ---
 
-## 10. Known Limitations
+## 10. External Text Metrics and Certificate Calibration
+
+The deterministic external audit uses task-specific metrics rather than treating every
+text dataset as the same prediction problem:
+
+| Dataset | Prediction surface | Primary metrics |
+|---|---|---|
+| SciFact | Claim support status and evidence retrieval | Accuracy, macro F1, evidence recall@5 |
+| HotpotQA distractor | Extracted evidence sentence | Normalized exact match, token F1, supporting-document recall@2 |
+| RAGBench COVID-QA | Lexical/numeric source consistency | Coverage, false-certification rate, precision, recall |
+
+For RAGBench, the score for a response is the minimum content-token coverage of any
+response sentence against the available document sentences. The score is forced to zero
+when a numeric token in the response is absent from the source. The threshold is selected
+on the validation split by maximizing coverage subject to an empirical false-certification
+rate of at most 5%, then frozen and evaluated once on the test split. Labels and thresholds
+from the test split are never used during selection.
+
+This certificate concerns narrow source consistency only. It does not certify factual
+truth, semantic entailment, clinical safety, or answer completeness.
+
+---
+
+## 11. Known Limitations
 
 1. The oracle assumes that oracle-produced outputs at stage N are compatible inputs for stage N+1. If the oracle scope returns records that the pipeline's extraction model has never seen, the E-stage may produce systematically different outputs than expected. This is inherent to the 3-component counterfactual model.
 
-2. Shapley computation requires all 8 subset interventions to be valid. Missing artifacts cause those subsets to return `v(S) = 0.0`, which may under-attribute error.
+2. Shapley computation requires all eight subset interventions to be valid. Missing or
+   incompatible artifacts make the attribution unavailable and are counted as failures.
 
 3. For text benchmarks, the `SupportStatus` loss mapping is a heuristic. It does not reflect any learned utility function. Two different queries with `SupportStatus.PARTIALLY_SUPPORTED` are treated as equal loss regardless of how much evidence was present.
 
 4. The deterministic fixture extractor is not a trained model and produces rule-based results. Reported `support_status` from the fixture extractor reflects keyword overlap, not semantic understanding.
+
+5. The SciFact deterministic baseline predicts one class for every example, so its
+   classification score is a negative baseline rather than a competitive claim-verification
+   result. The HotpotQA evidence-sentence baseline likewise has near-zero answer exact match.
+
+6. The RAGBench certificate is validation-calibrated but not distribution-free. Its test
+   false-certification rate can exceed the validation target, and the reported confidence
+   intervals do not constitute a formal finite-sample risk guarantee.

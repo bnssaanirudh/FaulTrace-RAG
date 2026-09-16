@@ -15,9 +15,17 @@ async def list_providers() -> list[dict[str, Any]]:
     return providers
 
 
-@router.get("/providers/{provider_id}/test", summary="Test provider connectivity")
+@router.post("/providers/{provider_id}/test", summary="Test provider connectivity")
 async def test_provider(provider_id: str, model_id: str = "gpt-3.5-turbo") -> dict[str, Any]:
     """Test connectivity to a specific provider."""
+    from faulttrace_api.config import get_settings
+
+    if not get_settings().allow_provider_connectivity_tests:
+        raise HTTPException(
+            status_code=403,
+            detail="Provider connectivity tests are disabled; set "
+            "FAULTTRACE_ALLOW_PROVIDER_CONNECTIVITY_TESTS=true for trusted local use.",
+        )
     try:
         provider_cls = get_provider(provider_id)
         provider = provider_cls()

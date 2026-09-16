@@ -1,0 +1,26 @@
+{
+  "IEEE_5page": {
+    "citation_keys": 19,
+    "bibliography_entries": 19,
+    "missing_in_bib": [],
+    "unused_bib_entries": []
+  },
+  "IEEE_6page": {
+    "citation_keys": 19,
+    "bibliography_entries": 19,
+    "missing_in_bib": [],
+    "unused_bib_entries": []
+  },
+  "Springer_Nature": {
+    "citation_keys": 19,
+    "bibliography_entries": 19,
+    "missing_in_bib": [],
+    "unused_bib_entries": []
+  },
+  "Elsevier": {
+    "citation_keys": 19,
+    "bibliography_entries": 19,
+    "missing_in_bib": [],
+    "unused_bib_entries": []
+  }
+}

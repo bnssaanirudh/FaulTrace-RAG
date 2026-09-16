@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Play, Database, FileJson, Calculator, Zap, ShieldAlert, ShieldCheck, ChevronRight, Activity } from 'lucide-react';
+import { useState } from 'react';
+import { Play, Database, FileJson, Calculator, Zap, ShieldAlert, ShieldCheck, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -14,7 +14,7 @@ export function DemoShell() {
   const [traceLogs, setTraceLogs] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
 
-  // Mock Worlds Data
+  // Explicitly illustrative values for the offline UI walkthrough.
   const worlds = [
     { id: '10', label: 'N=10 (Micro)' },
     { id: '50', label: 'N=50 (Small)' },
@@ -60,7 +60,7 @@ export function DemoShell() {
 
   const isComplete = pipelineState === 'complete';
   
-  // Fake chart data based on query type to show different failure modes
+  // Illustrative chart values; never exported as experiment measurements.
   const chartData = [
     { name: 'Retrieval', value: queryType === 'count' ? 0.05 : 0.65 },
     { name: 'Extraction', value: queryType === 'count' ? 0.85 : 0.25 },
@@ -82,7 +82,7 @@ export function DemoShell() {
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
-            <span className="text-xs type-mono text-emerald-400">Sandbox API Connected</span>
+            <span className="text-xs type-mono text-amber-400">Offline UI Simulation — No Measured Data</span>
           </div>
         </div>
       </header>
@@ -127,7 +127,7 @@ export function DemoShell() {
               className="bg-neon text-black px-6 py-2.5 rounded font-bold type-mono text-sm flex items-center gap-2 hover:bg-orange-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shrink-0 w-full sm:w-auto justify-center"
             >
               <Play className="w-4 h-4 fill-black" />
-              {pipelineState === 'idle' || pipelineState === 'complete' ? 'Execute Run' : 'Running...'}
+              {pipelineState === 'idle' || pipelineState === 'complete' ? 'Preview Simulation' : 'Simulating...'}
             </button>
           </div>
 

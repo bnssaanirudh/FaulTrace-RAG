@@ -12,6 +12,7 @@ dependencies = [
     "faulttrace-data",
     "faulttrace-gold",
     "faulttrace-pipelines",
+    "faulttrace-reporting",
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
     "pydantic>=2.7.0",
@@ -21,6 +22,7 @@ dependencies = [
     "orjson>=3.10.0",
     "structlog>=24.1.0",
     "python-multipart>=0.0.9",
+    "pandas>=2.2.0",
 ]
 
 [tool.setuptools.packages.find]

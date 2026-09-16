@@ -13,10 +13,10 @@ class DenseRetriever(RetrievalEngine):
         # Use CPU explicitly if no GPU to avoid unexpected warnings on some envs
         device = "cuda" if torch.cuda.is_available() else "cpu"
         self.model = SentenceTransformer(model_name, device=device)
-        self.units = []
-        self.corpus_embeddings = None
+        self.units: list[RetrievalUnit] = []
+        self.corpus_embeddings: Any | None = None
 
-    def build_index(self, units: list[RetrievalUnit], **kwargs):
+    def build_index(self, units: list[RetrievalUnit], **kwargs) -> None:
         """Build the dense index from the given units."""
         self.units = units
         if not self.units:
@@ -41,7 +41,7 @@ class DenseRetriever(RetrievalEngine):
         # Sort scores and indices
         top_results = torch.topk(cos_scores, k=min(top_k, len(self.units)))
 
-        results = []
+        results: list[dict[str, Any]] = []
         for rank, (score, idx) in enumerate(zip(top_results[0], top_results[1], strict=False)):
             results.append(
                 {"unit": self.units[idx.item()], "score": float(score.item()), "rank": rank + 1}

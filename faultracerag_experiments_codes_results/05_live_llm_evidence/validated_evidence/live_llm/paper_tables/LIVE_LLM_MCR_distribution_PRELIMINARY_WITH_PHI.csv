@@ -1,0 +1,13 @@
+model,mcr_label,size,fraction
+Mistral-7B-Instruct-v0.3,E,10,0.13157894736842105
+Mistral-7B-Instruct-v0.3,E+R,9,0.11842105263157894
+Mistral-7B-Instruct-v0.3,R,15,0.19736842105263158
+Mistral-7B-Instruct-v0.3,unrecoverable,42,0.5526315789473685
+Phi-4-mini-instruct,E,1,0.01020408163265306
+Phi-4-mini-instruct,E+R,1,0.01020408163265306
+Phi-4-mini-instruct,R,1,0.01020408163265306
+Phi-4-mini-instruct,unrecoverable,95,0.9693877551020408
+Qwen2.5-3B-Instruct,E,11,0.13414634146341464
+Qwen2.5-3B-Instruct,E+R,9,0.10975609756097561
+Qwen2.5-3B-Instruct,R,7,0.08536585365853659
+Qwen2.5-3B-Instruct,unrecoverable,55,0.6707317073170732

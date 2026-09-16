@@ -1,14 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { HelpCircle, Play, ChevronLeft, ChevronRight, Filter, Download, Info, Eye, Clipboard } from 'lucide-react';
+import { HelpCircle, Play, ChevronLeft, ChevronRight, Download, Eye, Clipboard } from 'lucide-react';
 import { api, Query, Run } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { familyBadgeClass, truncateId } from '@/lib/utils';
+import { familyBadgeClass } from '@/lib/utils';
 
 const FAMILIES = ['', 'count', 'mean', 'proportion', 'comparison', 'top_k', 'trend'];
 const DIFFICULTIES = ['', 'easy', 'medium', 'adversarial'];
@@ -42,7 +42,7 @@ export function QueriesPage() {
   const [selectedQuery, setSelectedQuery] = useState<Query | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  async function load(p = page, f = family, d = difficulty, s = split) {
+  const load = useCallback(async (p: number, f: string, d: string, s: string) => {
     setLoading(true);
     try {
       const res = await api.listQueries(undefined, f || undefined, p, 20);
@@ -69,7 +69,7 @@ export function QueriesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [goldReadyOnly, selectivity]);
 
   useEffect(() => {
     // Update URL params
@@ -81,8 +81,8 @@ export function QueriesPage() {
     const qs = params.toString();
     router.replace(`/queries${qs ? '?' + qs : ''}`);
 
-    load(page, family, difficulty, split);
-  }, [page, family, difficulty, selectivity, split, goldReadyOnly]);
+    void load(page, family, difficulty, split);
+  }, [page, family, difficulty, selectivity, split, goldReadyOnly, load, router]);
 
   async function executeQuery(queryId: string) {
     setRunningId(queryId);

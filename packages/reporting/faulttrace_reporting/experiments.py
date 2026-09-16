@@ -7,7 +7,6 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
-import uuid
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -55,11 +54,12 @@ class ExperimentSpec(BaseModel):
     context_budget: int = 4000
     batch_size: int = 10
     repair_policy: str = "strict_exact_v1"
-    certificate_policy: str = "strict_exact_v1"
+    certificate_policy: str = "strict_structured_semantic_v2"
     seeds: list[int] = [42]
     timeout_seconds: float = 30.0
     retries: int = 3
     cache_policy: str = "use_cache"  # use_cache, recompute
+    require_gold: bool = True
     output_root: str = "artifacts/experiments"
     tags: list[str] = ["demo"]
 
@@ -70,6 +70,23 @@ class ExperimentSpec(BaseModel):
             if p not in PIPELINE_REGISTRY:
                 raise ValueError(f"Unknown pipeline: {p}. Registered: {list(PIPELINE_REGISTRY)}")
         return v
+
+    @field_validator("seeds")
+    @classmethod
+    def validate_seeds(cls, values: list[int]) -> list[int]:
+        if not values:
+            raise ValueError("At least one execution seed is required")
+        if len(values) != len(set(values)):
+            raise ValueError("Execution seeds must be unique")
+        return values
+
+    @field_validator("certificate_policy")
+    @classmethod
+    def validate_certificate_policy(cls, value: str) -> str:
+        supported = {"strict_exact_v1", "strict_structured_semantic_v2"}
+        if value not in supported:
+            raise ValueError(f"Unsupported certificate policy: {value}")
+        return value
 
     def get_config_hash(self) -> str:
         """Deterministically compute config hash."""
@@ -84,6 +101,20 @@ class ExperimentSpec(BaseModel):
         ):
             # Safe fallback: let provider be deterministic for P0
             pass
+
+        if "top_k" in self.tags:
+            unsupported = []
+            for pipeline_id in self.pipelines:
+                pipeline_class = PIPELINE_REGISTRY[pipeline_id]
+                import inspect
+
+                if "top_k" not in inspect.signature(pipeline_class.__init__).parameters:
+                    unsupported.append(pipeline_id)
+            if unsupported:
+                raise ValueError(
+                    "top_k ablation selected pipelines that do not consume top_k: "
+                    + ", ".join(unsupported)
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +133,11 @@ class Job(BaseModel):
     model: str
     seed: int
     parameters: dict[str, Any]
+    dataset_id: str
+    dataset_snapshot_id: str | None = None
+    world_record_ids_hash: str
+    query_spec_hash: str
+    gold_answer_hash: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +166,14 @@ class ResumableMatrixRunner:
         db = self.get_db()
         from faulttrace_api.database import QueryRow, WorldRow
 
-        # Load queries
-        q_rows = db.query(QueryRow).all()
+        # Dataset selection is anchored through the query's world. A display
+        # label is never allowed to select unrelated database rows.
+        q_rows = (
+            db.query(QueryRow)
+            .join(WorldRow, WorldRow.world_id == QueryRow.world_id)
+            .filter(WorldRow.dataset_id == self.spec.dataset_id)
+            .all()
+        )
         jobs: list[Job] = []
 
         for q_row in q_rows:
@@ -153,6 +195,9 @@ class ResumableMatrixRunner:
             except Exception:
                 difficulty = "easy"
 
+            if self.spec.require_gold and not q_row.gold_json:
+                continue
+
             if difficulty not in self.spec.difficulty_strata:
                 continue
 
@@ -161,6 +206,8 @@ class ResumableMatrixRunner:
                 for provider in self.spec.providers:
                     for model in self.spec.models:
                         for seed in self.spec.seeds:
+                            if pipeline == "P0-deterministic-scope-baseline" and provider != "deterministic":
+                                continue
                             job_params = {
                                 "retriever": self.spec.retriever,
                                 "top_k": self.spec.top_k,
@@ -172,7 +219,14 @@ class ResumableMatrixRunner:
                             }
                             # Unique deterministic Job ID
                             raw_id = f"{q_row.query_id}_{pipeline}_{provider}_{model}_{seed}_{self.config_hash}"
-                            job_id = hashlib.md5(raw_id.encode("utf-8")).hexdigest()
+                            job_id = hashlib.sha256(raw_id.encode("utf-8")).hexdigest()[:32]
+                            query_spec_hash = QuerySpec.model_validate(spec_dict).spec_hash()
+                            gold_answer_hash = None
+                            if q_row.gold_json:
+                                gold_payload = json.loads(q_row.gold_json)
+                                gold_answer_hash = hashlib.sha256(
+                                    json.dumps(gold_payload, sort_keys=True, default=str).encode("utf-8")
+                                ).hexdigest()
 
                             jobs.append(
                                 Job(
@@ -186,6 +240,11 @@ class ResumableMatrixRunner:
                                     model=model,
                                     seed=seed,
                                     parameters=job_params,
+                                    dataset_id=w_row.dataset_id,
+                                    dataset_snapshot_id=spec_dict.get("dataset_snapshot_id"),
+                                    world_record_ids_hash=w_row.record_ids_hash,
+                                    query_spec_hash=query_spec_hash,
+                                    gold_answer_hash=gold_answer_hash,
                                 )
                             )
         return jobs
@@ -195,7 +254,7 @@ class ResumableMatrixRunner:
         jobs = self.expand_matrix()
         total_jobs = len(jobs)
 
-        # Estimate simulated tokens
+        # Pre-run planning estimate only; never exported as a measured result.
         est_tokens_in = 0
         est_tokens_out = 0
         est_cost_usd = 0.0
@@ -211,6 +270,8 @@ class ResumableMatrixRunner:
         return {
             "total_jobs": total_jobs,
             "config_hash": self.config_hash,
+            "dataset_id": self.spec.dataset_id,
+            "unique_queries": len({job.query_id for job in jobs}),
             "estimated_input_tokens": est_tokens_in,
             "estimated_output_tokens": est_tokens_out,
             "estimated_cost_usd": est_cost_usd,
@@ -223,6 +284,11 @@ class ResumableMatrixRunner:
 
         jobs = self.expand_matrix()
         total_jobs = len(jobs)
+        if total_jobs == 0:
+            raise ValueError(
+                f"No eligible queries for dataset_id={self.spec.dataset_id!r}, "
+                f"scales={self.spec.scales}, families={self.spec.query_families}"
+            )
 
         # Upsert Experiment status
         exp_row = (
@@ -313,7 +379,13 @@ class ResumableMatrixRunner:
 
             # Execute pipeline logic directly
             try:
-                pipeline = get_pipeline(job.pipeline_id, settings.artifacts_root)
+                pipeline = get_pipeline(
+                    job.pipeline_id,
+                    settings.artifacts_root,
+                    provider_id=job.provider_id,
+                    model_id=job.model,
+                )
+                pipeline.execution_seed = job.seed
                 # Override parameters on the instantiated pipeline
                 if hasattr(pipeline, "top_k"):
                     pipeline.top_k = job.parameters["top_k"]
@@ -322,21 +394,47 @@ class ResumableMatrixRunner:
                     query=query_spec, df=df, gold_answer=gold, parquet_path=parquet_path
                 )
 
+                if run_obj.status.value != "completed":
+                    detail = run_obj.error_message or "pipeline returned a failed run"
+                    raise RuntimeError(
+                        f"{job.pipeline_id} failed at {run_obj.error_stage or 'unknown'}: {detail}"
+                    )
+
                 answer = run_obj.answer
                 is_correct = run_obj.is_correct
-                loss = run_obj.loss or 0.0
+                loss = run_obj.loss
 
-                # Compute policy decision / selective certificates
-                policy_decision = "certified"
-                abstention_reason = None
-
-                # Check for perturbed wrong scope
-                if (
-                    job.pipeline_id == "P1-wrong-scope"
-                    or job.pipeline_id == "P4-compound-scope-facts"
-                ):
-                    policy_decision = "abstain"
-                    abstention_reason = "SCOPE_COVERAGE_UNKNOWN"
+                provenance = {
+                    "schema_version": "1.0.0",
+                    "experiment_config_hash": self.config_hash,
+                    "job_id": job.job_id,
+                    "dataset_id": job.dataset_id,
+                    "dataset_snapshot_id": job.dataset_snapshot_id,
+                    "world_id": job.world_id,
+                    "world_record_ids_hash": job.world_record_ids_hash,
+                    "query_id": job.query_id,
+                    "query_spec_hash": job.query_spec_hash,
+                    "gold_answer_hash": job.gold_answer_hash,
+                    "pipeline_id": job.pipeline_id,
+                    "requested_provider_id": job.provider_id,
+                    "actual_provider_id": run_obj.provider_id,
+                    "model_id": job.model,
+                    "seed": job.seed,
+                    "certificate_policy_id": run_obj.certificate_policy_id,
+                    "certificate_assurance_scope": run_obj.certificate_assurance_scope,
+                    "parameters": job.parameters,
+                    "pipeline_config_hash": run_obj.config_hash,
+                    "source_artifact_references": run_obj.artifact_references,
+                }
+                job_output = output_path / job.job_id
+                job_output.mkdir(parents=True, exist_ok=True)
+                provenance_path = job_output / "provenance.json"
+                provenance_path.write_text(
+                    json.dumps(provenance, indent=2, sort_keys=True, default=str),
+                    encoding="utf-8",
+                )
+                artifact_references = dict(run_obj.artifact_references)
+                artifact_references["provenance"] = str(provenance_path)
 
                 # Update Run details in database
                 run_row.status = "completed"
@@ -344,11 +442,20 @@ class ResumableMatrixRunner:
                 run_row.gold_answer_value = str(gold.answer_value) if gold else None
                 run_row.is_correct = is_correct
                 run_row.loss = loss
-                run_row.latency_ms = float(getattr(run_obj, "latency_ms", 40.0) or 40.0)
-                run_row.policy_decision = policy_decision
-                run_row.abstention_reason = abstention_reason
-                run_row.certificate_id = str(uuid.uuid4())
-                run_row.certificate_hash = hashlib.sha256(str(answer).encode("utf-8")).hexdigest()
+                run_row.latency_ms = run_obj.latency_ms
+                run_row.provider_id = run_obj.provider_id
+                run_row.config_hash = run_obj.config_hash
+                run_row.artifact_refs_json = json.dumps(artifact_references, default=str)
+                run_row.raw_answer = str(run_obj.raw_answer)
+                run_row.policy_decision = run_obj.policy_decision
+                run_row.final_presented_answer = (
+                    str(run_obj.final_presented_answer)
+                    if run_obj.final_presented_answer is not None
+                    else None
+                )
+                run_row.abstention_reason = run_obj.abstention_reason
+                run_row.certificate_id = run_obj.certificate_id
+                run_row.certificate_hash = run_obj.certificate_hash
                 run_row.completed_at = datetime.utcnow()
 
                 # Add trace events to DB
@@ -369,7 +476,7 @@ class ResumableMatrixRunner:
                         payload_json=json.dumps(
                             getattr(ev, "structured_payload", {}) or {}, default=str
                         ),
-                        timestamp=datetime.utcnow(),
+                        timestamp=ev.timestamp,
                     )
                     db.add(trace_row)
 

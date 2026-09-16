@@ -1,6 +1,6 @@
 {
   "name": "ablation_topk_50",
-  "dataset_id": "amazon_demo",
+  "dataset_id": "track_m",
   "scales": [
     200
   ],
@@ -12,13 +12,13 @@
     "medium"
   ],
   "pipelines": [
-    "P4-compound-scope-facts"
+    "P1-direct-bm25"
   ],
   "providers": [
     "deterministic"
   ],
   "models": [
-    "gpt-4o-mini"
+    "deterministic-v1"
   ],
   "retriever": "bm25",
   "top_k": 50,
@@ -26,7 +26,7 @@
   "context_budget": 4000,
   "batch_size": 10,
   "repair_policy": "strict_exact_v1",
-  "certificate_policy": "strict_exact_v1",
+  "certificate_policy": "strict_structured_semantic_v2",
   "seeds": [
     42
   ],

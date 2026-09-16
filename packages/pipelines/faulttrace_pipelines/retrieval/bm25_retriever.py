@@ -52,7 +52,14 @@ class BM25Retriever:
 
         tokenized_corpus = []
         for _, row in df.iterrows():
-            record = CorpusRecord.model_validate(row.to_dict())
+            # Parquet nullable scalar columns are materialized by pandas as NaN.
+            # Pydantic (correctly) rejects NaN for finite numeric fields, so restore
+            # the source-level nulls before validating the record model.
+            record_data = {
+                key: None if not isinstance(value, list | dict) and pd.isna(value) else value
+                for key, value in row.to_dict().items()
+            }
+            record = CorpusRecord.model_validate(record_data)
             units = self.renderer.render(record)
             for unit in units:
                 self.units.append(unit)

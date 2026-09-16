@@ -40,19 +40,32 @@ class PTextRetrieve:
         query_text: str,
         units: list[RetrievalUnit],
         dataset_id: str = "unknown",
+        split: str | None = None,
+        gold_support_status: str | None = None,
     ) -> dict:
-        """Run retrieval and return ranked results."""
+        """Run retrieval and return ranked results.
+
+        ``split`` and ``gold_support_status`` are accepted as benchmark metadata so
+        this concrete pipeline conforms to :class:`BenchmarkRunner`'s call contract.
+        Gold labels are never consumed by retrieval.
+        """
         t0 = time.perf_counter()
 
-        bm25 = index_manager.get_or_build("bm25", units, BM25Retriever(), {})
+        bm25 = index_manager.get_or_build(
+            "bm25", units, BM25Retriever(), {}, dataset_id=dataset_id
+        )
 
         if self.retriever_type == "bm25":
             results = bm25.search(query_text, top_k=self.top_k)
         elif self.retriever_type == "dense":
-            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+            dense = index_manager.get_or_build(
+                "dense", units, DenseRetriever(), {}, dataset_id=dataset_id
+            )
             results = dense.search(query_text, top_k=self.top_k)
         else:  # hybrid
-            dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+            dense = index_manager.get_or_build(
+                "dense", units, DenseRetriever(), {}, dataset_id=dataset_id
+            )
             hybrid = HybridRetriever(bm25, dense)
             hybrid.units = units
             results = hybrid.search(query_text, top_k=self.top_k)
@@ -65,6 +78,7 @@ class PTextRetrieve:
         return {
             "query_id": query_id,
             "dataset_id": dataset_id,
+            "split": split,
             "pipeline_id": self.pipeline_id,
             "retriever_type": self.retriever_type,
             "ranked_doc_ids": ranked_ids,

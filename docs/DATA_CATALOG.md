@@ -32,23 +32,20 @@ python -m faulttrace_data.cli seed --seed 42 --scales 10,50,200,1000
 | **Type** | Scientific claim verification benchmark |
 | **Source** | Wadden et al., EMNLP 2020 |
 | **URL** | https://github.com/allenai/scifact |
-| **Records** | ~5,000 claims, ~10,000 documents |
+| **Local snapshot** | 5,183 documents; 1,109 queries; 300 scored test queries |
 | **Format** | JSONL (claims + corpus) |
-| **License** | Apache 2.0 |
-| **Location** | `data/benchmarks/scifact/` (after download) |
-| **Labels** | SUPPORT, REFUTE, NEI (not enough info) |
-
-**To download:**
-```bash
-cd data/benchmarks
-git clone https://github.com/allenai/scifact.git
-# Or use the adapter: SciFactAdapter(Path("data/benchmarks")).load_corpus()
-```
+| **License** | CC BY-NC 2.0 (dataset; not the repository code license) |
+| **Location** | `data/benchmarks/scifact/beir/scifact/` |
+| **Retrieval labels** | BEIR train/test qrels |
 
 **Usage notes:**
 - `SciFactAdapter` in `packages/data/faulttrace_data/benchmarks/scifact.py` handles loading
 - Corpus contains PubMed abstracts; claims are manually annotated
-- Use `split="test"` for evaluation; training set is available for future fine-tuning
+- The canonical retrieval run uses BEIR test qrels; the original SciFact unlabeled challenge test set is a different split.
+- The official dev claims are also used by the deterministic claim-status and injected
+  R/E/A attribution audit. That audit uses a rule-based provider and must not be reported
+  as learned or LLM claim verification.
+- Snapshot hash: `0d49c220aa54cbcd320c9d9054ed81b2d58f170776a7f270b06cd8b46c0e83d4`
 
 ---
 
@@ -59,21 +56,18 @@ git clone https://github.com/allenai/scifact.git
 | **Type** | Multi-hop question answering |
 | **Source** | Yang et al., EMNLP 2018 |
 | **URL** | https://hotpotqa.github.io/ |
-| **Records** | ~113k QA pairs |
-| **Format** | JSON |
+| **Local snapshot** | 90,447 train rows; 7,405 validation rows |
+| **Format** | Hugging Face Parquet |
 | **License** | CC BY-SA 4.0 |
-| **Location** | `data/benchmarks/hotpotqa/` (after download) |
+| **Location** | `data/benchmarks/hotpotqa/distractor/` |
 | **Labels** | Answer string + supporting facts |
 
-**To download:**
-```bash
-wget http://curtis.ml.cmu.edu/datasets/hotpot/hotpot_dev_fullwiki_v1.json -O data/benchmarks/hotpotqa/dev.json
-```
-
 **Usage notes:**
-- HotpotQA requires multi-hop retrieval (two supporting documents per question)
+- The measured task ranks the supplied distractor contexts per validation question. It is not fullwiki/open-domain retrieval.
+- A deterministic evidence-sentence baseline also runs on all 7,405 validation questions
+  for pipeline-mechanics and negative certification analysis; it is not a trained QA model.
 - The `HotpotQAAdapter` in `packages/data/faulttrace_data/benchmarks/hotpotqa.py` handles loading
-- FaultTrace-RAG uses it to test multi-hop evidence chains in the provenance graph
+- Snapshot hash: `9a8a3bb2c682e6eadc7b2780cf58bb5094494360896345f4e4a3a3a4bcebae2a`
 
 ---
 
@@ -81,13 +75,23 @@ wget http://curtis.ml.cmu.edu/datasets/hotpot/hotpot_dev_fullwiki_v1.json -O dat
 
 | Field | Value |
 |---|---|
-| **Type** | COVID-19 biomedical QA |
-| **Source** | CORD-19 / Möller et al., 2020 |
-| **URL** | https://huggingface.co/datasets/covid_qa_deepset |
-| **Records** | ~2,000 QA pairs from CORD-19 papers |
-| **Format** | JSON (SQuAD format) |
+| **Type** | RAGBench COVID-QA supplied-context benchmark |
+| **Source** | Galileo RAGBench |
+| **URL** | https://huggingface.co/datasets/galileo-ai/ragbench |
+| **Local snapshot** | 1,252 train; 267 validation; 246 test rows |
+| **Format** | Hugging Face Parquet |
 | **License** | CC BY 4.0 |
-| **Location** | `data/benchmarks/covidqa/` (after download) |
+| **Location** | `data/benchmarks/ragbench/covidqa/` |
+
+The measured test task ranks each row's supplied documents after deduplicating identical
+document text. Four test rows have no positive relevance key and are excluded from scored
+metrics. Snapshot hash:
+`a1dcc76fd4883515c68208e715f4f0488ca4369957e110cbcaf0f52c61134700`.
+
+The validation and test responses are additionally used for a narrow lexical/numeric
+source-consistency audit. The validation split selects one threshold; the held-out test
+split measures coverage and false certification without retuning. This is not semantic
+entailment or truth certification.
 
 ---
 
@@ -117,6 +121,18 @@ Located in `apps/api/tests/fixtures/`:
 
 These are hand-crafted fixtures that do NOT require downloading any external data.
 They are used by `test_evidence_extraction.py` and `test_text_attribution.py`.
+
+## Provenance boundary
+
+The complete external files are present in the working copy but ignored by Git and
+excluded from release archives. Their historical download commands/revisions were not
+recorded at acquisition time. The canonical run therefore makes the narrower, auditable
+claim that the exact local files were hashed before evaluation, remained unchanged during
+evaluation, and had no query-ID overlap across declared splits. It does not claim a
+cryptographically verified chain from each upstream server to this checkout.
+
+See [the external benchmark audit](EXTERNAL_BENCHMARK_AUDIT.md) for the complete
+classification and validation decisions.
 
 ---
 

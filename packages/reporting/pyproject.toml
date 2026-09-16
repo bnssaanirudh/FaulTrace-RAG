@@ -9,7 +9,12 @@ description = "Reporting utilities for FaultTrace-RAG"
 requires-python = ">=3.11"
 dependencies = [
     "faulttrace-core",
+    "faulttrace-pipelines",
     "orjson>=3.10.0",
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "matplotlib>=3.8.0",
+    "sqlalchemy>=2.0.30",
 ]
 
 [tool.setuptools.packages.find]

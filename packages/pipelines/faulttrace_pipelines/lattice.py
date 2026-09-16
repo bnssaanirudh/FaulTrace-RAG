@@ -76,6 +76,16 @@ class OracleLatticeRunner:
             )
             subset_runs[subset] = lattice_run
 
+        invalid = [name for name, run in subset_runs.items() if run.status != "valid"]
+        if invalid:
+            reasons = {
+                name: subset_runs[name].natural_language_summary for name in invalid
+            }
+            raise ValueError(
+                "Counterfactual attribution requires a complete valid lattice; "
+                f"invalid subsets={reasons}"
+            )
+
         # Compute exact Shapley
         baseline_loss = subset_runs["none"].loss_diagnostic.normalized_loss
 
@@ -90,12 +100,7 @@ class OracleLatticeRunner:
             reveals that oracle scope changes the aggregation domain in a harmful way).
             Negative values represent harmful oracle components and are preserved — not clamped.
             """
-            run = subset_runs[subset_name]
-            if run.status != "valid":
-                # Mark invalid with reason stored in natural_language_summary
-                # Return 0.0 only for invalid interventions (no info, not negative info)
-                return 0.0
-            loss = run.loss_diagnostic.normalized_loss
+            loss = subset_runs[subset_name].loss_diagnostic.normalized_loss
             # Not clamped: can be negative if oracle replacement makes things worse
             return baseline_loss - loss
 
@@ -122,16 +127,13 @@ class OracleLatticeRunner:
         phi_E = shapley("E", ["E", "RE", "EA", "REA"], ["none", "R", "A", "RA"])
         phi_A = shapley("A", ["A", "RA", "EA", "REA"], ["none", "R", "E", "RE"])
 
-        # Interaction term: error remaining after attributing to individual components
-        # Recoverable error = v(REA) = how much error can be recovered by fixing ALL components
+        # Exact Shapley efficiency leaves no separate residual interaction term.
+        # Keep the field for schema compatibility and expose only numerical drift.
         recoverable = v("REA")
         attributed = phi_R + phi_E + phi_A
-        # Interaction can be negative (super-additive) or positive (sub-additive)
-        # It is NOT clamped. Negative interaction means component effects are complementary.
         interaction = recoverable - attributed
-        # We do NOT normalize/scale Shapley values. The mathematical guarantee is:
-        # phi_R + phi_E + phi_A + interaction = v(REA) = total_recoverable_error
-        # Scaling would violate the efficiency axiom and hide interaction effects.
+        if abs(interaction) < 1e-12:
+            interaction = 0.0
 
         return LatticeDiagnosticSummary(
             parent_run_id=parent_run.run_id,
@@ -158,6 +160,24 @@ class OracleLatticeRunner:
         status = "valid"
         answer_value = None
 
+        def artifact_path(*keys: str) -> Path | None:
+            for key in keys:
+                value = parent_run.artifact_references.get(key)
+                if value and Path(value).exists():
+                    return Path(value)
+            return None
+
+        # Resolve the concrete pipeline once so non-oracle components can be
+        # replayed on upstream counterfactual outputs.
+        from faulttrace_pipelines import get_pipeline
+
+        pipeline = get_pipeline(
+            parent_run.pipeline_id,
+            self.artifacts_dir / "component_replay",
+            provider_id=parent_run.provider_id,
+        )
+        pipeline.execution_seed = parent_run.execution_seed
+
         # Stage 1: Retrieval/Scope
         if replace_R:
             scope_res = self.scope_oracle.evaluate(query, corpus_df)
@@ -179,21 +199,37 @@ class OracleLatticeRunner:
                 # If extraction.parquet exists, those are the records extracted.
                 # The prompt states: "Reuse compatible cached non-oracle components where valid"
                 # If parent run didn't save extraction, we fail diagnostic.
-                extract_path = parent_run.artifact_references.get("fact_extract")
-                if extract_path and Path(extract_path).exists():
-                    parent_df = pd.read_parquet(extract_path)
+                scope_path = artifact_path("scope_enumerate", "scope_output")
+                extract_path = artifact_path("fact_extract", "extraction")
+                source_path = scope_path or extract_path
+                if source_path:
+                    parent_df = pd.read_parquet(source_path)
                     current_record_ids = (
                         parent_df["record_id"].tolist() if "record_id" in parent_df.columns else []
                     )
+                    if "record_id" not in parent_df.columns:
+                        raise ValueError("Parent scope artifact does not contain record_id")
                 else:
                     status = "invalid"
                     return self._build_lattice_run(
-                        parent_run, subset_name, None, gold_answer, query, status
+                        parent_run,
+                        subset_name,
+                        None,
+                        gold_answer,
+                        query,
+                        status,
+                        "parent scope artifact is unavailable",
                     )
-            except Exception:
+            except Exception as exc:
                 status = "invalid"
                 return self._build_lattice_run(
-                    parent_run, subset_name, None, gold_answer, query, status
+                    parent_run,
+                    subset_name,
+                    None,
+                    gold_answer,
+                    query,
+                    status,
+                    f"could not load parent scope: {exc}",
                 )
 
         # Stage 2: Extraction
@@ -204,33 +240,30 @@ class OracleLatticeRunner:
             ext_res = self.extraction_oracle.evaluate(query.fact_spec, supplied_df)
             extracted_rows = ext_res.fact_rows
         else:
-            # If not replacing E, we MUST use the parent's extracted facts for these record IDs
-            # But wait: if R is replaced, the parent pipeline may not have extracted facts for the new R records!
-            # The prompt says: "Replacing E operates on the record set produced by the current R path unless R is also replaced."
-            # Wait! If R is replaced but E is NOT, how does E (pipeline) extract the new records?
-            # It would have to run the pipeline's extraction model again on the new records!
-            # But "exhaustive deterministic replacement... Reuse compatible cached non-oracle components where valid"
-            # If we don't have it, we would theoretically run the pipeline.
-            # To simplify and ensure deterministic speed, we will mock the pipeline extraction as "fail" if records are missing,
-            # or we re-run the pipeline's extraction. For P4/P5, caching is built-in.
             try:
-                extract_path = parent_run.artifact_references.get("fact_extract")
-                if extract_path and Path(extract_path).exists():
-                    parent_df = pd.read_parquet(extract_path)
-                    # Filter to current_record_ids
-                    # Any records in current_record_ids NOT in parent_df are missing from extraction!
-                    extracted_rows = parent_df[
-                        parent_df["record_id"].isin(current_record_ids)
-                    ].to_dict(orient="records")
+                current_df = corpus_df[corpus_df["record_id"].isin(current_record_ids)].copy()
+                if replace_R:
+                    # Critical compositional behavior: R* feeds the original
+                    # pipeline extractor E-hat, rather than filtering cached E.
+                    extracted_rows = pipeline.replay_extraction(query, current_df)
                 else:
-                    status = "invalid"
-                    return self._build_lattice_run(
-                        parent_run, subset_name, None, gold_answer, query, status
-                    )
-            except Exception:
+                    extract_path = artifact_path("fact_extract", "extraction")
+                    if not extract_path:
+                        raise ValueError("parent extraction artifact is unavailable")
+                    parent_df = pd.read_parquet(extract_path)
+                    if "record_id" in parent_df.columns:
+                        parent_df = parent_df[parent_df["record_id"].isin(current_record_ids)]
+                    extracted_rows = parent_df.to_dict(orient="records")
+            except Exception as exc:
                 status = "invalid"
                 return self._build_lattice_run(
-                    parent_run, subset_name, None, gold_answer, query, status
+                    parent_run,
+                    subset_name,
+                    None,
+                    gold_answer,
+                    query,
+                    status,
+                    f"pipeline extraction replay failed: {exc}",
                 )
 
         # Stage 3: Aggregation
@@ -240,25 +273,7 @@ class OracleLatticeRunner:
             )
             answer_value = agg_res.answer_value
         else:
-            # If not replacing A, we apply the pipeline's reducer.
-            # We can re-use the P4 reduce logic: load into pandas, clear scope, call PandasEvaluator.
-            # Wait, P4's reduce logic IS PandasEvaluator! So A_hat is basically the same as A* in P4?
-            # Actually, the pipeline's evaluator might differ or be the same.
-            # We'll use the pipeline's aggregation. Since P4 and P5 use PandasEvaluator, we can use it.
-            if not extracted_rows:
-                answer_value = None
-            else:
-                ext_df = pd.DataFrame(extracted_rows)
-                if "scope_decision" in ext_df.columns:
-                    ext_df = ext_df[ext_df["scope_decision"] == "in_scope"]
-                eval_query = query.model_copy(deep=True)
-                from faulttrace_core.models import IsNotNullPredicate
-
-                eval_query.scope_predicate = IsNotNullPredicate(field="record_id")
-                from faulttrace_gold.pandas_engine import PandasEvaluator
-
-                evaluator = PandasEvaluator()
-                answer_value = evaluator.evaluate(eval_query, ext_df).get("result")
+            answer_value = pipeline.replay_aggregation(query, extracted_rows)
 
         return self._build_lattice_run(
             parent_run, subset_name, answer_value, gold_answer, query, status
@@ -272,6 +287,7 @@ class OracleLatticeRunner:
         gold_answer: GoldAnswer,
         query: QuerySpec,
         status: str,
+        reason: str | None = None,
     ) -> LatticeRun:
         if status == "valid":
             loss_diag = compute_loss(
@@ -283,7 +299,11 @@ class OracleLatticeRunner:
         else:
             loss_diag = LossDiagnostic(normalized_loss=1.0, status="invalid")
 
-        summary = f"Subset {subset_name} yielded normalized loss {loss_diag.normalized_loss:.4f}."
+        summary = (
+            f"Subset {subset_name} yielded normalized loss {loss_diag.normalized_loss:.4f}."
+            if status == "valid"
+            else f"Subset {subset_name} is invalid: {reason or 'component replay unavailable'}."
+        )
 
         run_obj = LatticeRun(
             intervention_id=str(uuid4()),

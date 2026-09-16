@@ -141,12 +141,13 @@ class DuckDBEvaluator:
 
     def _mean(self, spec: MeanSpec, scope_sql: str, con: duckdb.DuckDBPyConnection) -> tuple:
         field = _validate_field_name(spec.field)
+        numeric_field = f"CAST({field} AS DOUBLE)"
         if spec.null_policy == NullPolicy.EXCLUDE:
-            sql = f"SELECT ROUND(AVG({field}), {spec.decimal_places}), COUNT({field}) FROM records WHERE {scope_sql} AND {field} IS NOT NULL"
+            sql = f"SELECT ROUND(AVG({numeric_field}), {spec.decimal_places}), COUNT({field}) FROM records WHERE {scope_sql} AND {field} IS NOT NULL"
         elif spec.null_policy == NullPolicy.INCLUDE_AS_ZERO:
-            sql = f"SELECT ROUND(AVG(COALESCE({field}, 0)), {spec.decimal_places}), COUNT(*) FROM records WHERE {scope_sql}"
+            sql = f"SELECT ROUND(AVG(COALESCE({numeric_field}, 0)), {spec.decimal_places}), COUNT(*) FROM records WHERE {scope_sql}"
         else:
-            sql = f"SELECT ROUND(AVG({field}), {spec.decimal_places}), COUNT({field}) FROM records WHERE {scope_sql}"
+            sql = f"SELECT ROUND(AVG({numeric_field}), {spec.decimal_places}), COUNT({field}) FROM records WHERE {scope_sql}"
 
         row = con.execute(sql).fetchone()
         val, n = row[0], row[1]  # type: ignore[index]
@@ -217,7 +218,7 @@ class DuckDBEvaluator:
             return float(val)
         elif spec.measure == "mean" and spec.field:
             field = _validate_field_name(spec.field)
-            sql = f"SELECT AVG({field}) FROM records WHERE {where_clause} AND {field} IS NOT NULL"
+            sql = f"SELECT AVG(CAST({field} AS DOUBLE)) FROM records WHERE {where_clause} AND {field} IS NOT NULL"
             val = con.execute(sql).fetchone()[0]  # type: ignore[index]
             return float(val) if val is not None else None
         elif spec.measure == "sum" and spec.field:
@@ -234,7 +235,7 @@ class DuckDBEvaluator:
             inner_sql = f"SELECT {group_field}, COUNT(*) AS _measure FROM records WHERE {scope_sql} GROUP BY {group_field}"
         elif spec.measure == "mean" and spec.value_field:
             val_field = _validate_field_name(spec.value_field)
-            inner_sql = f"SELECT {group_field}, AVG({val_field}) AS _measure FROM records WHERE {scope_sql} AND {val_field} IS NOT NULL GROUP BY {group_field}"
+            inner_sql = f"SELECT {group_field}, AVG(CAST({val_field} AS DOUBLE)) AS _measure FROM records WHERE {scope_sql} AND {val_field} IS NOT NULL GROUP BY {group_field}"
         elif spec.measure == "sum" and spec.value_field:
             val_field = _validate_field_name(spec.value_field)
             inner_sql = f"SELECT {group_field}, SUM({val_field}) AS _measure FROM records WHERE {scope_sql} GROUP BY {group_field}"
@@ -270,7 +271,7 @@ class DuckDBEvaluator:
             null_clause = (
                 f" AND {val_field} IS NOT NULL" if spec.null_policy == NullPolicy.EXCLUDE else ""
             )
-            inner = f"{bucket_expr} AS _bucket, AVG({val_field}) AS _measure"
+            inner = f"{bucket_expr} AS _bucket, AVG(CAST({val_field} AS DOUBLE)) AS _measure"
             scope_sql = scope_sql + null_clause
         else:
             inner = f"{bucket_expr} AS _bucket, COUNT(*) AS _measure"

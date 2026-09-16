@@ -41,7 +41,7 @@ def mock_extract_semantic_predicates(corpus_text: str, toponyms: str, n: int = 2
 
 def run_track_t():
     print("======================================")
-    print("Running Track T Semantic Annotation Pipeline")
+    print("Running Track T SIMULATED FIXTURE (not a measured benchmark)")
     print("======================================")
 
     data_dir = Path("data")
@@ -137,12 +137,13 @@ def run_track_t():
     trace_path = out_dir / f"{run_id}_trace.json"
 
     output_payload = {
+        "measurement_status": "simulated_fixture_not_for_research_claims",
         "run": run.model_dump(mode="json"),
         "certificate": cert.model_dump(mode="json"),
         "observations": obs.model_dump(mode="json"),
     }
 
-    trace_path.write_text(json.dumps(output_payload, indent=2))
+    trace_path.write_text(json.dumps(output_payload, indent=2), encoding="utf-8")
     print(f"Saved validation trace log to {trace_path}")
 
 

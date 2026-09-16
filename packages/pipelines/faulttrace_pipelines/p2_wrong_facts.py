@@ -78,7 +78,11 @@ def _corrupt_dataframe(df: pd.DataFrame, fields: list[str], rng: random.Random) 
             if field == "rating":
                 df[field] = df[field].clip(1.0, 5.0).round(1)
 
-        elif pd.api.types.is_bool_dtype(dtype) or col.isin([True, False]).all():
+        elif pd.api.types.is_bool_dtype(dtype) or (
+            pd.api.types.is_object_dtype(dtype)
+            and len(col.dropna()) > 0
+            and col.dropna().map(lambda value: isinstance(value, bool)).all()
+        ):
             # 30% bit-flip on boolean fields
             df[field] = col.apply(lambda v: (not v) if rng.random() < 0.30 else v)
 
@@ -102,6 +106,25 @@ def _corrupt_dataframe(df: pd.DataFrame, fields: list[str], rng: random.Random) 
     return df
 
 
+def _overlay_corrupted_fields(
+    source_df: pd.DataFrame, corrupted_df: pd.DataFrame
+) -> pd.DataFrame:
+    """Overlay corrupted facts without relying on incompatible dtype coercion."""
+    result = source_df.copy()
+    if corrupted_df.empty:
+        return result
+    for column in corrupted_df.columns:
+        if column not in result.columns or column in ("record_id", "world_id"):
+            continue
+        source_values = result.loc[corrupted_df.index, column]
+        if corrupted_df[column].equals(source_values):
+            continue
+        if result[column].dtype != corrupted_df[column].dtype:
+            result[column] = result[column].astype(corrupted_df[column].dtype)
+        result.loc[corrupted_df.index, column] = corrupted_df[column]
+    return result
+
+
 class P2WrongFacts(AbstractPipeline):
     """
     P2 — Wrong Fact Extraction fault injection pipeline.
@@ -112,6 +135,12 @@ class P2WrongFacts(AbstractPipeline):
 
     pipeline_id = PIPELINE_ID
     provider_id = PROVIDER_ID
+
+    def replay_extraction(self, query: QuerySpec, scoped_df: pd.DataFrame) -> list[dict[str, Any]]:
+        rng = self.fault_rng(query, "facts")
+        fields = query.fact_spec.fields
+        fact_df = _eval.extract_facts(query.fact_spec, scoped_df)
+        return _corrupt_dataframe(fact_df, fields, rng).to_dict(orient="records")
 
     def _execute(
         self,
@@ -159,10 +188,11 @@ class P2WrongFacts(AbstractPipeline):
 
         # ── Stage 3: fact_extract (FAULTY — adds noise) ──
         t2 = time.perf_counter()
-        rng = random.Random(str(query.query_id))
+        rng = self.fault_rng(query, "facts")
         fields = query.fact_spec.fields
         avail = [f for f in fields if f in scope_df.columns]
-        raw_extraction = scope_df[avail].copy() if avail else scope_df.copy()
+        lineage_fields = (["record_id"] if "record_id" in scope_df.columns else []) + avail
+        raw_extraction = scope_df[list(dict.fromkeys(lineage_fields))].copy()
         corrupted_df = _corrupt_dataframe(raw_extraction, avail, rng)
         extract_duration = (time.perf_counter() - t2) * 1000
 
@@ -189,10 +219,7 @@ class P2WrongFacts(AbstractPipeline):
         # ── Stage 4: aggregate (correct oracle on corrupted data) ──
         t3 = time.perf_counter()
         # Re-join corrupted fields back into full df for evaluation
-        eval_df = df.copy()
-        for col in corrupted_df.columns:
-            if col in eval_df.columns and col not in ("record_id", "world_id"):
-                eval_df.loc[corrupted_df.index, col] = corrupted_df[col].values
+        eval_df = _overlay_corrupted_fields(df, corrupted_df)
 
         agg_result = _eval.evaluate(query, eval_df)
         answer_value = agg_result.get("result")

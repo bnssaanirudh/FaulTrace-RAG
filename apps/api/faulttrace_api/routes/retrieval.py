@@ -60,8 +60,8 @@ def compare_retrievers(req: RetrievalCompareRequest):
     dense = DenseRetriever()
 
     # Get or build from cache
-    bm25 = index_manager.get_or_build("bm25", units, bm25, {})
-    dense = index_manager.get_or_build("dense", units, dense, {})
+    bm25 = index_manager.get_or_build("bm25", units, bm25, {}, dataset_id=req.dataset_id)
+    dense = index_manager.get_or_build("dense", units, dense, {}, dataset_id=req.dataset_id)
 
     hybrid = HybridRetriever(bm25, dense)
     hybrid.units = (
@@ -118,8 +118,12 @@ def get_metrics(
     # Limit number of queries to avoid long runtimes during testing
     q_ids = list(eval_queries.keys())[:limit]
 
-    bm25 = index_manager.get_or_build("bm25", units, BM25Retriever(), {})
-    dense = index_manager.get_or_build("dense", units, DenseRetriever(), {})
+    bm25 = index_manager.get_or_build(
+        "bm25", units, BM25Retriever(), {}, dataset_id=dataset_id
+    )
+    dense = index_manager.get_or_build(
+        "dense", units, DenseRetriever(), {}, dataset_id=dataset_id
+    )
     hybrid = HybridRetriever(bm25, dense)
     hybrid.units = units
 

@@ -1,0 +1,17 @@
+mode,group,alpha,tau,cal_coverage,cal_upper_bound,test_coverage,test_risk,n_test_cert
+global,all,0.05,,0.0,,0.0,,0
+global,all,0.1,,0.0,,0.0,,0
+global,all,0.15,,0.0,,0.0,,0
+global,all,0.2,,0.0,,0.0,,0
+task_conditional,Data2txt,0.05,,0.0,,0.0,,0
+task_conditional,Data2txt,0.1,,0.0,,0.0,,0
+task_conditional,Data2txt,0.15,,0.0,,0.0,,0
+task_conditional,Data2txt,0.2,,0.0,,0.0,,0
+task_conditional,QA,0.05,,0.0,,0.0,,0
+task_conditional,QA,0.1,,0.0,,0.0,,0
+task_conditional,QA,0.15,,0.0,,0.0,,0
+task_conditional,QA,0.2,,0.0,,0.0,,0
+task_conditional,Summary,0.05,,0.0,,0.0,,0
+task_conditional,Summary,0.1,,0.0,,0.0,,0
+task_conditional,Summary,0.15,,0.0,,0.0,,0
+task_conditional,Summary,0.2,,0.0,,0.0,,0

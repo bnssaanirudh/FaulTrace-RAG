@@ -141,8 +141,9 @@ class TextAttributionResult:
     failure_category: str | None = None  # From BenchmarkErrorTaxonomy
 
     value_function_note: str = (
-        "v(S) = baseline_loss - loss(S). "
-        "loss(support_status): SUPPORTED=0.0, PARTIALLY=0.5, INSUFFICIENT=0.5, "
+        "v(S) = baseline_loss - loss(S, gold). "
+        "loss is the absolute distance between predicted and gold support-status "
+        "positions: SUPPORTED=0.0, PARTIALLY=0.5, INSUFFICIENT=0.5, "
         "CONFLICTING=0.8, UNSUPPORTED=1.0. "
         "NOT clamped. interaction = v(REA) - sum(phi_i)."
     )
@@ -174,16 +175,14 @@ class TextAttributionResult:
 # ---------------------------------------------------------------------------
 
 
-def support_status_loss(status: str) -> float:
+def support_status_loss(status: str, gold_status: str = "supported") -> float:
     """
-    Map a SupportStatus string to a loss value in [0.0, 1.0].
+    Compare a predicted SupportStatus with the gold status in [0.0, 1.0].
 
-    This is the value function used by TextAttributor. The mapping is:
-    - SUPPORTED             → 0.0 (perfect)
-    - PARTIALLY_SUPPORTED   → 0.5 (half credit)
-    - INSUFFICIENT_EVIDENCE → 0.5 (abstention, neutral)
-    - CONFLICTING           → 0.8 (bad — active conflict found)
-    - UNSUPPORTED           → 1.0 (worst — document refutes the claim)
+    Statuses are placed on the original support-to-refutation scale and loss is
+    their absolute distance. The one-argument form remains backward compatible
+    by using ``supported`` as gold, while attribution always supplies its actual
+    gold label.
     """
     mapping = {
         "supported": 0.0,
@@ -192,7 +191,9 @@ def support_status_loss(status: str) -> float:
         "conflicting": 0.8,
         "unsupported": 1.0,
     }
-    return mapping.get(status.lower(), 0.5)
+    predicted = mapping.get(status.lower(), 0.5)
+    gold = mapping.get(gold_status.lower(), 0.5)
+    return abs(predicted - gold)
 
 
 # ---------------------------------------------------------------------------
@@ -228,13 +229,13 @@ class TextAttributor:
         """
 
         def v(subset: str) -> float:
-            baseline = support_status_loss(pipeline_support_status)
+            baseline = support_status_loss(pipeline_support_status, gold_support_status)
             if subset not in oracle_results:
                 return 0.0
-            subset_loss = support_status_loss(oracle_results[subset])
+            subset_loss = support_status_loss(oracle_results[subset], gold_support_status)
             return baseline - subset_loss  # Can be negative
 
-        baseline_loss = support_status_loss(pipeline_support_status)
+        baseline_loss = support_status_loss(pipeline_support_status, gold_support_status)
 
         if baseline_loss == 0.0:
             phi_r = phi_e = phi_a = interaction = recoverable = 0.0

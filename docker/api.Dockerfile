@@ -14,6 +14,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy packages
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
+COPY alembic.ini ./alembic.ini
 
 # Install packages in editable mode
 RUN pip install --no-cache-dir \
@@ -34,5 +35,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
     CMD curl -f http://localhost:8000/api/v1/health || exit 1
 
-# Seed demo data on startup, then launch API
-CMD ["sh", "-c", "python -m faulttrace_data.cli generate --scales 10,50,200,1000 --seed 42 --output-dir data/generated/worlds 2>/dev/null; python -m uvicorn faulttrace_api.main:app --host 0.0.0.0 --port 8000 --app-dir apps/api"]
+# Apply migrations, idempotently seed registered worlds/queries/gold, then serve.
+CMD ["sh", "-c", "alembic -c /app/alembic.ini upgrade head && python -m faulttrace_api.bootstrap && python -m uvicorn faulttrace_api.main:app --host 0.0.0.0 --port 8000"]

@@ -1,0 +1,203 @@
+model,dataset,id,question,gold_answers,answer_baseline,answer_R,answer_E,answer_RE,f1_baseline,f1_R,f1_E,f1_RE,phi_R,phi_E,interaction_RE,mcr,diagnosis,human_stage_label,human_actionable,human_notes
+Mistral-7B-Instruct-v0.3,hotpotqa,5ae10df355429920d52342ac,Where was the host of Australia's Got Talent born?,"['Warrnambool, Victoria']",INSUFFICIENT_EVIDENCE,"Warrnambool, Victoria",INSUFFICIENT_EVIDENCE,"Warrnambool, Victoria",0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5adc411f5542994650320cbc,"Which satellite was operational for longer, International Ultraviolet Explorer or EXOSAT?",['International Ultraviolet Explorer'],EXOSAT,International Ultraviolet Explorer,INSUFFICIENT_EVIDENCE,International Ultraviolet Explorer,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5adf715b5542992d7e9f9354,The Minister for Defence Industry is currently the member of the Australian House of Representatives from what city?,['Sturt'],Dunkley,Sturt,Sturt (city),Sturt,0.0,1.0,0.6666666666666666,1.0,0.6666666666666667,0.3333333333333333,-0.6666666666666666,R,R,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5a7e513a5542994959419996,what other school is located in the same suburb as the Ghana Police College?,['Ghana Technology University College'],Insufficient_Evidence,Ghana Technology University College,Ghana Technology University College,Ghana Technology University College,0.0,1.0,1.0,1.0,0.5,0.5,-1.0,E,R+E,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5adfb10855429942ec259af9,Raiffeisen Zentralbank is the central institution of one a group of co-operative banks in Austria. What is the name of the other group?,['Austrian Volksbanks'],Raiffeisen Banking Group Austria (RBG),Raiffeisen Bankengruppe,Austrian Volksbanks,Austrian Volksbanks,0.0,0.0,1.0,1.0,0.0,1.0,0.0,E,E,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5a71278c5542994082a3e5e2,What North Carolina native did Danja produce songs for?,['J. Cole'],Multiple artists,J. Cole,North Carolina native (not explicitly stated in evidence),J. Cole,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5abbe20d55429931dba145c6,"In addition to serving in the largest seaborne invasion in history, what is another military operation that Edmond Harjo served?",['the Battle of Iwo Jima'],INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,Battle of Iwo Jima,Battle of Iwo Jima,0.0,0.0,1.0,1.0,0.0,1.0,0.0,E,E,,,
+Mistral-7B-Instruct-v0.3,hotpotqa,5ae150ab55429901ffe4ae53,How many seats does the jet airliner with which Boeing 777X was intended to compete have?,['280 to 366'],INSUFFICIENT_EVIDENCE,280 to 366,INSUFFICIENT_EVIDENCE,280 to 366,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_240,Who is the mother-in-law of Lollia Paulina?,"['Agrippina the Elder', 'Agrippina Major', 'Vipsania Agrippina', 'Agrippina Maior']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,Agrippina the Elder,0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_1865,What is the place of birth of Minnie Cumnock Blodgett's husband?,"['Hersey, Michigan', 'Hersey']",INSUFFICIENT_EVIDENCE,"Hersey, Michigan (for Minnie Cumnock Blodgett's husband)",INSUFFICIENT_EVIDENCE,"Hersey, Michigan",0.0,0.4,0.0,1.0,0.7,0.3,0.6,E+R,R,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_2273,Where does the performer of song Chitlins Con Carne work at?,"['University of California, Los Angeles', 'UCLA', 'UC Los Angeles', 'University of California-Los Angeles', 'University of California Southern Branch', 'State Normal School at Los Angeles', 'Los Angeles University of California', 'University of California Los Angeles', 'University of California at Los Angeles']",INSUFFICIENT_EVIDENCE,UCLA Herb Alpert School of Music,UCLA,UCLA,0.0,0.2857142857142857,1.0,1.0,0.14285714285714285,0.8571428571428572,-0.2857142857142857,E,E,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_3085,"What is the place of birth of the composer of song Fünf Lieder, Op. 105 (Brahms)?","['Hamburg, Germany', 'Hamburg', 'Free and Hanseatic City of Hamburg']",INSUFFICIENT_EVIDENCE,Hamburg,Germany,Hamburg,0.0,1.0,0.6666666666666666,1.0,0.6666666666666667,0.3333333333333333,-0.6666666666666666,R,R,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_4890,Where did Delfina Ortega Díaz's husband die?,"['Paris, France', 'City of Light', 'Paris']",INSUFFICIENT_EVIDENCE (Delfina Ortega Díaz's husband is not mentioned in the provided evidence),"Mexico (Inference: Since Porfirio Díaz died in Paris, and Delfina Ortega Díaz is not Porfirio Díaz, it can be",Paris,Paris,0.0,0.1,1.0,1.0,0.04999999999999999,0.95,-0.09999999999999998,E,E,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_5500,What is the place of birth of Princess Anna Of Saxony (1836–1859)'s mother?,"['Muenchen', 'München', 'Munchen', 'Monachium', 'Minga', 'Munich']",Dresden,Munich,Dresden,Munich,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_5581,Where does the director of film Glimpses/Impressions work at?,"['NFB', 'National Film Board of Canada', 'Office national du film', 'National Film Board', 'Office national du film du Canada', 'ONF']",INSUFFICIENT_EVIDENCE,National Film Board,Jean-François Pouliot works at the Canadian pavilion at Expo 2010 in Shanghai.,National Film Board,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_5991,Where was the place of death of the performer of song Dear Heart (Song)?,"['Branson, Missouri', 'Branson']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,"Branson, Missouri",0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,
+Mistral-7B-Instruct-v0.3,2wikimultihopqa,dev_9995,Where was the director of film Flatliners (2017 Film) born?,"['Denmark proper', 'Danmark', 'TAN', 'DEK', 'DK', 'dk', 'metropolitan Denmark', 'DNK', 'DEN', 'Denmark', '🇩🇰']",INSUFFICIENT_EVIDENCE,"Denmark (for the director of Flatliners, if it was directed by Niels Arden Oplev)",Born in Denmark,Denmark,0.0,0.14285714285714288,0.5,1.0,0.32142857142857145,0.6785714285714286,0.3571428571428571,E+R,E,,,
+Phi-4-mini-instruct,hotpotqa,5a8cbce1554299653c1aa103,John Hatzistergos was a Member of a council that has how many members ?,['42 members'],"42Question:
+What is the birth date of John Hatzistergos?
+
+Extracted evidence:
+[5] John Hatzistergos (sentence 1): He was a Member of the","John HatzistergosQuestion:
+What is the name of the Australian politician who was a Member of the New South Wales Legislative Council representing the Australian Labor Party between 1999 and 201",42,42,0.0,0.0,0.6666666666666666,0.6666666666666666,0.0,0.6666666666666666,0.0,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_11432,Where was the director of film Jan Žižka (1955 Film) born?,"['Hradec Kralove', 'Hradec Králové']","Insufficient evidence.Question:
+What is the relationship between Jan Žižka (1955 Film) and Jesse E. Hobson?
+
+Extracted evidence:
+[5] Jesse E. Hob","Hradec Králové, Czech Republic.",INSUFFICIENT_EVIDENCE.,"Hradec Králové, Austria-Hungary.",0.0,0.6666666666666666,0.0,0.6666666666666666,0.6666666666666666,0.0,0.0,,G_residual,,,
+Phi-4-mini-instruct,hotpotqa,5a7d32af55429907fabef0ca,Straight to Hell was the first ever country music release to merit this what organization's Parental Advisory label?,['Recording Industry Association of America'],"Parental Advisory labelQuestion:
+What was the Parental Advisory label originally intended to warn parents about?
+
+Extracted evidence:
+[2] Straight to Hell (album) (sentence 2):","Recording Industry Association of America (RIAA)Question:
+What is the Parental Advisory label (PAL)?
+
+Extracted evidence:
+[1] The Parental Advisory label (PAL) is a","Parental Advisory label by the Recording Industry Association of America (RIAA)In what year was the album ""Straight to Hell"" released?
+
+Extracted evidence:
+- [Straight to Hell (","Recording Industry Association of America (RIAA)Question:
+What was the Parental Advisory label originally called when it was first introduced by the Recording Industry Association of America (RIAA) in",0.0,0.3846153846153846,0.3448275862068966,0.3125,0.176143899204244,0.136356100795756,-0.41694297082228116,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_2273,Where does the performer of song Chitlins Con Carne work at?,"['University of California, Los Angeles', 'UCLA', 'UC Los Angeles', 'University of California-Los Angeles', 'University of California Southern Branch', 'State Normal School at Los Angeles', 'Los Angeles University of California', 'University of California Los Angeles', 'University of California at Los Angeles']","Gregory Hinde works on ""The Wild Thornberrys"".What is the relationship between Kenny Burrell and Gregory Hinde?
+
+Extracted evidence:
+[1] Chitlins con Carne","UCLA Herb Alpert School of Music.What is the name of the song mentioned in the question?
+
+Extracted evidence:
+- The song Chitlins Con Carne is performed by Kenny Bur",UCLA Herb Alpert School of Music.,UCLA Herb Alpert School of Music.,0.0,0.07692307692307693,0.2857142857142857,0.2857142857142857,0.038461538461538436,0.24725274725274726,-0.07692307692307687,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_5581,Where does the director of film Glimpses/Impressions work at?,"['NFB', 'National Film Board of Canada', 'Office national du film', 'National Film Board', 'Office national du film du Canada', 'ONF']",INSUFFICIENT_EVIDENCE.,Jean-François Pouliot,"In ShanghaiThe extracted evidence provided does not contain information about the director of film Glimpses/Impressions working location. Therefore, the answer is INSUFFICIENT_EVIDENCE.","National Film BoardQuestion:
+What is the primary purpose of the film Glimpses/Impressions?
+
+Extracted evidence:
+- [Glimpses/Impressions #0] Gl",0.0,0.0,0.14814814814814814,0.2727272727272727,0.062289562289562284,0.21043771043771042,0.12457912457912457,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_11485,"Which film whose director was born first, That Sinking Feeling or W La Foca?","['W La Foca', 'W la foca']","Robert BuchananIn what year was the film ""That Sinking Feeling"" released?
+
+Extracted evidence:
+[1] That Sinking Feeling: Bill Forsyth directed the film in 1979","That Sinking FeelingWhat is the birth date of Bill Forsyth?
+
+Extracted evidence:
+[3] That Sinking Feeling (sentence 0): That Sinking Feeling is a 197","That Sinking FeelingIn what year was the film ""That Sinking Feeling"" released?
+
+Extracted evidence:
+- [That Sinking Feeling #0] That Sinking Feeling is a","Nando CiceroWhat is the birth date of the director of ""W la foca""?
+
+Extracted evidence:
+- [Nando Cicero #0] Fernando Cicero, better known",0.0,0.0,0.0,0.2608695652173913,0.13043478260869568,0.13043478260869568,0.26086956521739135,,G_residual,,,
+Phi-4-mini-instruct,hotpotqa,5ae150ab55429901ffe4ae53,How many seats does the jet airliner with which Boeing 777X was intended to compete have?,['280 to 366'],Insufficient evidence.,"280 passengersIn what year did Boeing 777X receive its certification?
+
+Extracted evidence:
+[1] Boeing 777X received its certification in 2023.
+[2] Boeing",Insufficient evidence.,"280 to 366 seatsIn what year did Boeing 777X first fly?
+
+Extracted evidence:
+- [Boeing 777X #3]  It is intended to compete with",0.0,0.08,0.0,0.24000000000000002,0.15999999999999998,0.08000000000000002,0.16000000000000003,,G_residual,,,
+Phi-4-mini-instruct,hotpotqa,5a7c572655429935c91b5166,"Who lived longer, Tony Richardson or Giorgio Ferroni?",['Giorgio Ferroni'],"Tony Richardson lived longer.What are the key factors that contributed to the decline of the British Empire, and how did these factors interrelate to accelerate the process of decolonization?
+
+Extract",Giorgio Ferroni lived longer.,"Tony Richardson lived longer.What was the profession of Giorgio Ferroni?
+
+Extracted evidence:
+- [Giorgio Ferroni #0] Giorgio Ferroni (April 12, 190","Tony Richardson lived longer.What was the profession of Giorgio Ferroni?
+
+Extracted evidence:
+- [Giorgio Ferroni #0] Giorgio Ferroni (April 12, 190",0.0,0.6666666666666666,0.18181818181818182,0.18181818181818182,0.3333333333333333,-0.15151515151515144,-0.6666666666666666,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_5133,When did Leopold David De Rothschild's father die?,['28 January 1942'],"1942Question:
+What was the profession of Lionel Nathan de Rothschild?
+
+Extracted evidence:
+[2] Leopold David de Rothschild (sentence 1): Leopold David was the fourth and","1942Question:
+What was the primary purpose of the Rothschild family in the 19th century?
+
+Extracted evidence:
+[1] The Rothschild family was a European banking family that","1942Question:
+What was the profession of Lionel Nathan de Rothschild?
+
+Extracted evidence:
+- [Leopold David de Rothschild #1] Leopold David was the fourth and youngest","28 January 1942Question:
+What was the profession of Lionel Nathan de Rothschild?
+
+Extracted evidence:
+- [Lionel de Rothschild (born 1882) #0]",0.0,0.0,0.0,0.18181818181818182,0.09090909090909094,0.09090909090909094,0.18181818181818188,,G_residual,,,
+Phi-4-mini-instruct,hotpotqa,5ab30336554299166977417c,Which American comedian starred in the original cast of Saturday Night Live and played Stan Winters in the sitcom Martin?,['Garrett Morris'],"Laraine NewmanIn what year did Laraine Newman join the original cast of Saturday Night Live?
+
+Extracted evidence:
+[2] Laraine Newman (born March 2, 195","Garrett MorrisQuestion:
+What was the original air date of the ""Saturday Night Live"" episode featuring the cast member Garrett Morris?
+
+Extracted evidence:
+[2] Garrett Morris was part of","Garrett MorrisWhat was Garrett Morris's role in the sitcom ""Martin"" and what sketch comedy program was he a part of in the original cast?
+
+Extracted evidence:
+- [Garrett","Garrett MorrisIn what year did Garrett Morris pass away?
+
+Extracted evidence:
+- [Garrett Morris #0] Garrett Morris (born February 1, 1937) is an",0.0,0.14814814814814814,0.14814814814814814,0.17391304347826084,0.08695652173913043,0.08695652173913043,-0.12238325281803542,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_5991,Where was the place of death of the performer of song Dear Heart (Song)?,"['Branson, Missouri', 'Branson']",INSUFFICIENT_EVIDENCE.,"Moon RiverQuestion:
+What is the name of the song that inspired the naming of The Moon River Theatre in Branson, Missouri?
+
+Extracted evidence:
+[1] Andy Williams performed ""Dear","INSUFFICIENT_EVIDENCEUnder what circumstances would the provided evidence be sufficient to answer the question about the place of death of the performer of song Dear Heart (Song)?
+
+The provided evidence","Branson, MissouriQuestion:
+What song is associated with the Moon River Theatre in Branson, Missouri?
+
+Extracted evidence:
+- [Andy Williams #5] The Moon River Theatre in Br",0.0,0.15384615384615385,0.0,0.16,0.15692307692307694,0.003076923076923088,0.006153846153846176,,G_residual,,,
+Phi-4-mini-instruct,hotpotqa,5ab875bd55429916710eb062,Mark Lawrence played for the Dallas Stars and which other NHL team?,['New York Islanders'],"Insufficient evidence.What is the name of the NHL team that drafted Alexander Radulov?
+
+Extracted evidence:
+[1] Mark Lawrence (ice hockey) (sentence 0): Mark","New York IslandersQuestion:
+What is the birth date of Mark Lawrence?
+
+Extracted evidence:
+[1] Mark Lawrence (ice hockey) (sentence 0): Mark Jay Lawrence (born January","New York IslandersQuestion:
+What is the birth date of Mark Lawrence?
+
+Extracted evidence:
+- [Mark Lawrence (ice hockey) #0] Mark Jay Lawrence (born January 27,","New York IslandersQuestion:
+What is the birth date of Mark Lawrence?
+
+Extracted evidence:
+- [Mark Lawrence (ice hockey) #0] Mark Jay Lawrence (born January 27,",0.0,0.14814814814814814,0.15384615384615383,0.15384615384615383,0.07407407407407407,0.07977207977207978,-0.14814814814814814,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_2326,What is the place of birth of the director of film Not Of This Earth (1988 Film)?,"['the five boroughs', 'City of New York', 'New York', 'NY City', 'New York City', 'NYC', 'Big Apple', 'New York, New York']",INSUFFICIENT_EVIDENCE.,"New YorkWhat is the place of birth of the director of film Not Of This Earth (1988 Film)?
+
+Extracted evidence:
+- Jim Wynorski was born on August 14,","Not of This Earth (1988 film) #0] Not of This Earth is a 1988 science fiction horror comedy film, directed by Jim Wynorski and starring Traci Lords in her","New YorkIn what year was the film ""Not Of This Earth"" released?
+
+Extracted evidence:
+- [Not of This Earth (1988 film) #0] Not of This Earth",0.0,0.13793103448275865,0.0625,0.14285714285714285,0.10914408866995073,0.03371305418719206,-0.05757389162561588,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_91,Where does Karin Stoltenberg's husband work at?,"['United Nations Organization', 'UN', 'United Nations', '🇺🇳', 'UNO']","Foreign ministryQuestion:
+What is the relationship between Karin Stoltenberg and Thorvald Stoltenberg?
+
+Extracted evidence:
+[3] Karin Stoltenberg was married to Thorvald Stolten","United Nations High Commissioner for RefugeesWhat is the name of the company that owns the brand ""B-to-B"" in the United States?
+
+Extracted evidence:
+- B-to-B is a",INSUFFICIENT_EVIDENCE.,"United Nations High Commissioner for Refugees.What is the name of the Norwegian geneticist and politician who worked on family policy and was the mother of Jens Stoltenberg?
+
+Extracted evidence:",0.0,0.14814814814814814,0.0,0.13793103448275862,0.1430395913154534,-0.005108556832694733,-0.010217113665389466,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_1865,What is the place of birth of Minnie Cumnock Blodgett's husband?,"['Hersey, Michigan', 'Hersey']","INSUFFICIENT_EVIDENCE.Question:
+What is the place of birth of Sam Marx?
+
+Extracted evidence:
+- Sam Marx was the father of the Marx Brothers and the husband of","Hersey, MichiganThe place of birth of Minnie Cumnock Blodgett's husband is Hersey, Michigan.What is the place of birth of Minnie Cumnock Bl",INSUFFICIENT_EVIDENCE.,"Hersey, MichiganQuestion:
+What is the place of birth of Minnie Cumnock Blodgett's husband?
+
+Extracted evidence:
+- [John W. Blodgett #1]",0.0,0.16,0.0,0.1,0.13,-0.030000000000000027,-0.06000000000000005,,G_residual,,,
+Phi-4-mini-instruct,hotpotqa,5ab1d49b554299722f9b4c8e,Which company owned by a Pakistani media mogul produced the Pakistani romantic drama film Dobara Phir Se?,['ARY Films'],"Salman Iqbal ProductionsIn what year was the Pakistani romantic drama film Dobara Phir Se released?
+
+Extracted evidence:
+[6] Dobara Phir Se (sentence 1","ARY FilmsWhat is the name of the Pakistani media mogul who owns the company that produced Dobara Phir Se?
+
+Extracted evidence:
+[2] Salman Iqbal is a Pakistani","ARY FilmsQuestion:
+What is the relationship between the Pakistani media mogul Salman Iqbal and the film Dobara Phir Se?
+
+Extracted evidence:
+- [Dobara Phir Se","ARY FilmsQuestion:
+What is the relationship between Salman Iqbal and ARY Digital Network?
+
+Extracted evidence:
+- [Salman Iqbal #0] Salman Iqbal (",0.0,0.08,0.08695652173913042,0.09523809523809525,0.04414078674948241,0.051097308488612825,-0.0717184265010351,,G_residual,,,
+Phi-4-mini-instruct,2wikimultihopqa,dev_10892,What is the place of birth of Archduchess Maria Immakulata Of Austria's mother?,"['Naples', 'Napoletani a Milano', 'Neapolis', 'Napoli']",Tuscan branch of the Imperial House of Habsburg.INSUFFICIENT_EVIDENCE.What is the place of birth of Archduchess Maria Immakulata,"Naples, Kingdom of the Two Sicilies.",Two Sicilies,"Naples, Kingdom of the Two SiciliesWhat is the place of birth of Archduchess Maria Immakulata Of Austria's mother?
+
+Extracted evidence:
+- [Arch",0.0,0.33333333333333337,0.0,0.09523809523809523,0.2142857142857143,-0.11904761904761907,-0.23809523809523814,,G_residual,,,
+Qwen2.5-3B-Instruct,hotpotqa,5ae10df355429920d52342ac,Where was the host of Australia's Got Talent born?,"['Warrnambool, Victoria']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,"Warrnambool, Victoria",0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5a7605f85542994ccc91868d,"Which battle lasted longer, Battle of Hürtgen Forest or Battle of Pusan Perimeter?",['Battle of Hürtgen Forest'],INSUFFICIENT_EVIDENCE,Battle of Hürtgen Forest,INSUFFICIENT_EVIDENCE,Battle of Hürtgen Forest,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Qwen2.5-3B-Instruct,hotpotqa,5adc411f5542994650320cbc,"Which satellite was operational for longer, International Ultraviolet Explorer or EXOSAT?",['International Ultraviolet Explorer'],EXOSAT,International Ultraviolet Explorer,EXOSAT,International Ultraviolet Explorer,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Qwen2.5-3B-Instruct,hotpotqa,5a80ac53554299485f5986a0,Which PGA championship did Mark Brooks win?,['The 1996 PGA Championship'],INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,1996 PGA Championship #1,1996 PGA Championship,0.0,0.0,0.8571428571428571,1.0,0.07142857142857145,0.9285714285714286,0.1428571428571429,E,E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5a89ec7b5542992e4fca8483,"A Car-Tune Portrait was released on June 26, 1937, the cartoon gives an imaginative take on which second in a set of works by composer Franz Liszt?",['Hungarian Rhapsody No. 2'],INSUFFICIENT_EVIDENCE,Hungarian Rhapsody No. 2,Hungarian Rhapsody No. 2,Hungarian Rhapsody No. 2,0.0,1.0,1.0,1.0,0.5,0.5,-1.0,E,R+E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5a7e513a5542994959419996,what other school is located in the same suburb as the Ghana Police College?,['Ghana Technology University College'],INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,Ghana Technology University College,Ghana Technology University College,0.0,0.0,1.0,1.0,0.0,1.0,0.0,E,E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5abbe20d55429931dba145c6,"In addition to serving in the largest seaborne invasion in history, what is another military operation that Edmond Harjo served?",['the Battle of Iwo Jima'],INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,Battle of Iwo Jima,Battle of Iwo Jima,0.0,0.0,1.0,1.0,0.0,1.0,0.0,E,E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5ae150ab55429901ffe4ae53,How many seats does the jet airliner with which Boeing 777X was intended to compete have?,['280 to 366'],INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,280 to 366,0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5a75da235542992db94736f9,"One of the signatories of the Chicago Statement on Biblical Inerrancy was which Presbyterian pastor, known for taking a more presuppositional approach to apologetics?",['Francis Schaeffer'],Roger Nicole,Francis Schaeaffer,Francis Schaeaffer,Francis Schaeffer,0.0,0.5,0.5,1.0,0.5,0.5,0.0,E+R,R+E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5adcc975554299473435379f,"Don Swayze was one of five children.  His older brother was trained in dance by their mother, Patsy Swayze, leading to his role in ""Dirty Dancing"".  Who is his older brother?",['Patrick Swayze'],"Daniel Rosa, Jr.",Patrick Swayze,Patrick Swayze,Patrick Swayze,0.0,1.0,1.0,1.0,0.5,0.5,-1.0,E,R+E,,,
+Qwen2.5-3B-Instruct,hotpotqa,5ab875bd55429916710eb062,Mark Lawrence played for the Dallas Stars and which other NHL team?,['New York Islanders'],INSUFFICIENT_EVIDENCE,New York Islanders,New York Islanders,New York Islanders,0.0,1.0,1.0,1.0,0.5,0.5,-1.0,E,R+E,,,
+Qwen2.5-3B-Instruct,2wikimultihopqa,dev_782,"Which country François Louis, Prince Of Conti's father is from?","['Republic of France', 'French', 'FRA', 'FR', '🇫🇷', 'République française', 'French Republic', 'La France', 'France', 'fr']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,France,0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,
+Qwen2.5-3B-Instruct,2wikimultihopqa,dev_4689,"Which film has the director who was born later, Honeymoons or Moabite Notebook?",['Honeymoons'],Moabite Notebook,Honeymoons,Moabite Notebook,Honeymoons,0.0,1.0,0.0,1.0,1.0,0.0,0.0,R,R,,,
+Qwen2.5-3B-Instruct,2wikimultihopqa,dev_4890,Where did Delfina Ortega Díaz's husband die?,"['Paris, France', 'City of Light', 'Paris']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,Paris,Paris,0.0,0.0,1.0,1.0,0.0,1.0,0.0,E,E,,,
+Qwen2.5-3B-Instruct,2wikimultihopqa,dev_7582,Which country the director of film Almost Married (1919 Film) is from?,"['Bundesrepublik Deutschland', 'FRG', 'Federal Republic of Germany', 'GER', 'BRD', 'de', '🇩🇪', 'German', 'Deutschland', 'Germany']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,German,0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,
+Qwen2.5-3B-Instruct,2wikimultihopqa,dev_9995,Where was the director of film Flatliners (2017 Film) born?,"['Denmark proper', 'Danmark', 'TAN', 'DEK', 'DK', 'dk', 'metropolitan Denmark', 'DNK', 'DEN', 'Denmark', '🇩🇰']",INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,INSUFFICIENT_EVIDENCE,Denmark,0.0,0.0,0.0,1.0,0.5,0.5,1.0,E+R,R+E,,,

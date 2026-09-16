@@ -1,0 +1,63 @@
+{
+  "cross_domain": {
+    "total_cases": 488250,
+    "identifiable_cases": 343197,
+    "identifiable_fraction": 0.7029124423963133,
+    "shapley_f1": 0.9280078205811823,
+    "singleton_f1": 0.8935305378543519,
+    "random_f1": 0.5906199646267304,
+    "mcr_exact": 0.7580952047949137,
+    "mcr_residual": 1.762287858552134e-05
+  },
+  "bacd_budget8": {
+    "n_budget8": 22062,
+    "bacd_f1": 0.9314185995311913,
+    "bacd_probes": 4.470356268697308,
+    "shapley_f1": 0.9400704076390777,
+    "exhaustive_probes": 32.0
+  },
+  "live_validated": {
+    "Mistral-7B-Instruct-v0.3": {
+      "n": 100,
+      "baseline_f1": 0.34341386391386386,
+      "repaired_f1": 0.5451293151293151,
+      "natural_failures": 76,
+      "repairable_fraction": 0.3684210526315789,
+      "phi_R": 0.25903654991258873,
+      "phi_E": 0.11063916910523557
+    },
+    "Qwen2.5-3B-Instruct": {
+      "n": 100,
+      "baseline_f1": 0.19523809523809527,
+      "repaired_f1": 0.4096666666666667,
+      "natural_failures": 82,
+      "repairable_fraction": 0.2682926829268293,
+      "phi_R": 0.14246999612853273,
+      "phi_E": 0.17419667053813395
+    }
+  },
+  "ragtruth": {
+    "lexical": {
+      "auroc": 0.7895376047868716,
+      "auprc": 0.6565148631217312,
+      "f1": 0.5863192182410424
+    },
+    "similarity": {
+      "auroc": 0.7507627595604136,
+      "auprc": 0.5522816119013461,
+      "f1": 0.5942492012779552
+    },
+    "nli": {
+      "auroc": 0.6917562724014338,
+      "auprc": 0.4614795766753121,
+      "f1": 0.5325443786982249
+    },
+    "full": {
+      "auroc": 0.7838502325305845,
+      "auprc": 0.6460989109013514,
+      "f1": 0.5954692556634305
+    }
+  },
+  "certification_settings": 16,
+  "max_test_coverage": 0.0
+}

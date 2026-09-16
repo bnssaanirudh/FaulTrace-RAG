@@ -19,7 +19,7 @@ def test_package_imports_resolve_cleanly():
             # We use importlib to ensure they are actually importable
             importlib.import_module(mod)
         except ImportError as e:
-            assert False, f"Failed to import {mod}. Ensure __init__.py exists and it is not ignored: {e}"
+            raise AssertionError(f"Failed to import {mod}. Ensure __init__.py exists and it is not ignored: {e}")
 
 def test_classes_exist():
     from faulttrace_data.benchmarks.covidqa import CovidQAAdapter

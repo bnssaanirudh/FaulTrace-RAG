@@ -1,0 +1,12 @@
+[
+  {
+    "name": "Qwen2.5-3B-Instruct",
+    "model_id": "Qwen/Qwen2.5-3B-Instruct",
+    "revision": "aa8e72537993ba99e69dfaafa59ed015b17504d1"
+  },
+  {
+    "name": "Mistral-7B-Instruct-v0.3",
+    "model_id": "mistralai/Mistral-7B-Instruct-v0.3",
+    "revision": "c170c708c41dac9275d15a8fff4eca08d52bab71"
+  }
+]

@@ -37,7 +37,7 @@ def compute_loss(
     if pipeline_answer is None:
         return LossDiagnostic(normalized_loss=1.0, status="abstained")
 
-    if isinstance(agg_spec, (CountSpec, SumSpec, MeanSpec, ProportionSpec, ComparisonSpec)):
+    if isinstance(agg_spec, CountSpec | SumSpec | MeanSpec | ProportionSpec | ComparisonSpec):
         return _compute_scalar_loss(pipeline_answer, gold_answer, tolerance)
     elif isinstance(agg_spec, TopKSpec):
         return _compute_topk_loss(pipeline_answer, gold_answer)

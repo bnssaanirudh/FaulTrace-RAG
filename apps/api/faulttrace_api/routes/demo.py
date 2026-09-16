@@ -78,51 +78,55 @@ async def seed_demo(
 
         db.commit()
 
-        # Generate queries for the largest world
+        # Generate and independently dual-engine validate queries for every
+        # world. A scale-filtered experiment must not silently borrow queries
+        # generated against a different corpus snapshot.
         largest_world_id = world_ids[-1]
-        parquet_path = worlds_dir / largest_world_id / "records.parquet"
-        df = pd.read_parquet(parquet_path)
-
         factory = QueryFactory(data_dir=data_root / "generated")
         validator = GoldValidator()
-        queries = factory.generate_for_world(world_id=largest_world_id, target_count=60)
 
         # Validate and store queries
         queries_stored = 0
+        queries_rejected = 0
         queries_dir = settings.artifacts_root / "queries"
         queries_dir.mkdir(parents=True, exist_ok=True)
 
-        out_path = queries_dir / f"queries_{largest_world_id}.jsonl"
-        with open(out_path, "w") as f:
-            for q in queries:
-                # Compute gold answer
-                gold_result = validator.validate(q, df, parquet_path)
+        for world_id in world_ids:
+            parquet_path = worlds_dir / world_id / "records.parquet"
+            df = pd.read_parquet(parquet_path)
+            queries = factory.generate_for_world(world_id=world_id, target_count=60)
+            out_path = queries_dir / f"queries_{world_id}.jsonl"
+            with open(out_path, "w", encoding="utf-8") as f:
+                for q in queries:
+                    gold_result = validator.validate(q, df, parquet_path)
+                    if not gold_result.agreed or gold_result.gold_answer is None:
+                        queries_rejected += 1
+                        continue
 
-                # Store in DB
-                existing_q = db.query(QueryRow).filter(QueryRow.query_id == q.query_id).first()
-                if existing_q:
-                    db.delete(existing_q)
+                    # Store only certified dual-engine gold. Unvalidated queries
+                    # are not eligible for benchmark or experiment selection.
+                    existing_q = db.query(QueryRow).filter(QueryRow.query_id == q.query_id).first()
+                    if existing_q:
+                        db.delete(existing_q)
 
-                gold_json = None
-                if gold_result.gold_answer:
                     gold_json = json.dumps(
                         gold_result.gold_answer.model_dump(mode="json"), default=str
                     )
 
-                q_row = QueryRow(
-                    query_id=q.query_id,
-                    world_id=q.world_id,
-                    family=q.family.value,
-                    natural_language_question=q.natural_language_question,
-                    template_id=q.template_id,
-                    version=q.version,
-                    spec_json=json.dumps(q.model_dump(mode="json"), default=str),
-                    gold_json=gold_json,
-                    created_at=q.created_at.replace(tzinfo=None),
-                )
-                db.add(q_row)
-                f.write(json.dumps(q.model_dump(mode="json"), default=str) + "\n")
-                queries_stored += 1
+                    q_row = QueryRow(
+                        query_id=q.query_id,
+                        world_id=q.world_id,
+                        family=q.family.value,
+                        natural_language_question=q.natural_language_question,
+                        template_id=q.template_id,
+                        version=q.version,
+                        spec_json=json.dumps(q.model_dump(mode="json"), default=str),
+                        gold_json=gold_json,
+                        created_at=q.created_at.replace(tzinfo=None),
+                    )
+                    db.add(q_row)
+                    f.write(json.dumps(q.model_dump(mode="json"), default=str) + "\n")
+                    queries_stored += 1
 
         db.commit()
 
@@ -135,6 +139,7 @@ async def seed_demo(
             "seed": request.seed,
             "world_ids": world_ids,
             "queries_generated": queries_stored,
+            "queries_rejected_by_gold_validation": queries_rejected,
             "largest_world_id": largest_world_id,
             "data_root": str(data_root),
         }

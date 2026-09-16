@@ -56,12 +56,6 @@ class ExtractionOracle:
         fact_df = self.evaluator._apply_fact_spec(fact_spec, supplied_df)
         fact_rows = fact_df.to_dict(orient="records")
 
-        # Ensure all types are python natives, not pandas objects like Timestamp
-        # Standardize types for comparison
-        import json
-
-        fact_rows = json.loads(json.dumps(fact_rows, default=str))
-
         return ExtractionOracleResult(
             fact_rows=fact_rows,
             metadata={"extracted_count": len(fact_rows), "shape": list(fact_df.shape)},

@@ -21,7 +21,7 @@ from pathlib import Path
 # Add project root to path so we can import packages
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent.resolve()))
 
-from apps.api.faulttrace_api.database import Base
+from faulttrace_api.database import Base
 
 target_metadata = Base.metadata
 
@@ -43,9 +43,11 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = os.environ.get("DATABASE_URL")
+    url = os.environ.get("FAULTTRACE_DATABASE_URL") or os.environ.get("DATABASE_URL")
     if not url:
-        url = config.get_main_option("sqlalchemy.url")
+        from faulttrace_api.config import get_settings
+
+        url = get_settings().effective_database_url
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -66,9 +68,12 @@ def run_migrations_online() -> None:
     """
     configuration = config.get_section(config.config_ini_section, {})
 
-    url = os.environ.get("DATABASE_URL")
-    if url:
-        configuration["sqlalchemy.url"] = url
+    url = os.environ.get("FAULTTRACE_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    if not url:
+        from faulttrace_api.config import get_settings
+
+        url = get_settings().effective_database_url
+    configuration["sqlalchemy.url"] = url
 
     connectable = engine_from_config(
         configuration,

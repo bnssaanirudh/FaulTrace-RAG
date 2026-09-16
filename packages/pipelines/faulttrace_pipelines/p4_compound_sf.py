@@ -12,7 +12,6 @@ The pipeline re-uses the perturbation functions from P1 and P2.
 
 from __future__ import annotations
 
-import random
 import time
 from pathlib import Path
 from typing import Any
@@ -28,7 +27,7 @@ from faulttrace_gold.pandas_engine import PandasEvaluator
 
 from faulttrace_pipelines.base import AbstractPipeline
 from faulttrace_pipelines.p1_wrong_scope import _perturb_predicate
-from faulttrace_pipelines.p2_wrong_facts import _corrupt_dataframe
+from faulttrace_pipelines.p2_wrong_facts import _corrupt_dataframe, _overlay_corrupted_fields
 
 PIPELINE_ID = "P4-compound-scope-facts"
 PROVIDER_ID = "fault-injection"
@@ -47,6 +46,12 @@ class P4CompoundSF(AbstractPipeline):
     pipeline_id = PIPELINE_ID
     provider_id = PROVIDER_ID
 
+    def replay_extraction(self, query: QuerySpec, scoped_df: pd.DataFrame) -> list[dict[str, Any]]:
+        rng = self.fault_rng(query, "facts")
+        fields = query.fact_spec.fields
+        fact_df = _eval.extract_facts(query.fact_spec, scoped_df)
+        return _corrupt_dataframe(fact_df, fields, rng).to_dict(orient="records")
+
     def _execute(
         self,
         run_id: str,
@@ -57,7 +62,8 @@ class P4CompoundSF(AbstractPipeline):
     ) -> tuple[Any, list, list, int, int]:
         events: list = []
         components: list = []
-        rng = random.Random(str(query.query_id))
+        scope_rng = self.fault_rng(query, "scope")
+        facts_rng = self.fault_rng(query, "facts")
 
         events.append(
             self._make_event(
@@ -71,7 +77,7 @@ class P4CompoundSF(AbstractPipeline):
 
         # ── Stage 2: scope (FAULTY — P1 perturbation) ──
         t1 = time.perf_counter()
-        wrong_pred = _perturb_predicate(query.scope_predicate, rng)
+        wrong_pred = _perturb_predicate(query.scope_predicate, scope_rng)
         try:
             mask = compiler.to_pandas_mask(wrong_pred, df)
             scope_df = df[mask].copy()
@@ -102,8 +108,9 @@ class P4CompoundSF(AbstractPipeline):
         t2 = time.perf_counter()
         fields = query.fact_spec.fields
         avail = [f for f in fields if f in scope_df.columns]
-        raw_extraction = scope_df[avail].copy() if avail else scope_df.copy()
-        corrupted_df = _corrupt_dataframe(raw_extraction, avail, rng)
+        lineage_fields = (["record_id"] if "record_id" in scope_df.columns else []) + avail
+        raw_extraction = scope_df[list(dict.fromkeys(lineage_fields))].copy()
+        corrupted_df = _corrupt_dataframe(raw_extraction, avail, facts_rng)
         extract_duration = (time.perf_counter() - t2) * 1000
 
         events.append(
@@ -124,10 +131,7 @@ class P4CompoundSF(AbstractPipeline):
 
         # ── Stage 4: aggregate (correct on doubly-corrupted data) ──
         t3 = time.perf_counter()
-        eval_df = df.copy()
-        for col in corrupted_df.columns:
-            if col in eval_df.columns and col not in ("record_id", "world_id"):
-                eval_df.loc[corrupted_df.index, col] = corrupted_df[col].values
+        eval_df = _overlay_corrupted_fields(df, corrupted_df)
 
         wrong_query = query.model_copy(update={"scope_predicate": wrong_pred})
         agg_result = _eval.evaluate(wrong_query, eval_df)

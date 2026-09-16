@@ -5,12 +5,12 @@ test.describe('FaultTrace-RAG End-to-End Demo Suite', () => {
   test('1. Dashboard loads successfully', async ({ page }) => {
     await page.goto('/');
     await expect(page).toHaveTitle(/FaultTrace-RAG/);
-    await expect(page.locator('text=FaultTrace')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /When the answer is wrong,\s*we tell you why\./ })).toBeVisible();
   });
 
   test('2. Can navigate to Datasets', async ({ page }) => {
-    await page.goto('/');
-    await page.click('text=Datasets');
+    await page.goto('/dashboard');
+    await page.getByRole('link', { name: 'Datasets', exact: true }).click();
     await expect(page).toHaveURL(/.*datasets/);
     await expect(page.locator('h1', { hasText: 'Datasets' })).toBeVisible();
   });
@@ -27,12 +27,12 @@ test.describe('FaultTrace-RAG End-to-End Demo Suite', () => {
 
   test('5. Run Lab opens and shows components', async ({ page }) => {
     await page.goto('/run-lab');
-    await expect(page.locator('h1', { hasText: 'Run Lab' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Experiment Launcher' })).toBeVisible();
   });
 
   test('6. Run History shows run records', async ({ page }) => {
     await page.goto('/runs');
-    await expect(page.locator('h1', { hasText: 'Run History' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pipeline Runs' })).toBeVisible();
   });
 
   test('7. Oracle Diagnostics loads correctly', async ({ page }) => {
@@ -47,7 +47,7 @@ test.describe('FaultTrace-RAG End-to-End Demo Suite', () => {
 
   test('9. Experiments page shows analytics', async ({ page }) => {
     await page.goto('/experiments');
-    await expect(page.locator('h1', { hasText: 'Experiments' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Controlled Benchmarks' })).toBeVisible();
   });
 
   test('10. Reports & Exports works', async ({ page }) => {

@@ -33,10 +33,55 @@ class P4FullScopeMERPipeline(AbstractPipeline):
     pipeline_id = PIPELINE_ID
     provider_id = PROVIDER_ID
 
-    def __init__(self, artifacts_dir: Path = Path("artifacts/runs")):
+    def __init__(
+        self,
+        artifacts_dir: Path = Path("artifacts/runs"),
+        provider_id: str = PROVIDER_ID,
+        model_id: str = "deterministic-valid",
+    ):
         super().__init__(artifacts_dir)
+        self.provider_id = provider_id
+        self.model_id = model_id
         self.cache = ExtractionCache()
         self.evaluator = PandasEvaluator()
+
+    def replay_extraction(self, query: QuerySpec, scoped_df: pd.DataFrame) -> list[dict[str, Any]]:
+        """Run the configured map extractor on a counterfactual retrieval set."""
+        from uuid import uuid4
+
+        from faulttrace_pipelines.scope_service import ScopeResult
+
+        record_ids = sorted(scoped_df["record_id"].tolist())
+        scope_result = ScopeResult(
+            is_success=True,
+            eligible_record_ids=record_ids,
+            total_world_count=len(scoped_df),
+            eligible_count=len(record_ids),
+            excluded_count=0,
+        )
+        plan = MapPlanner.create_plan(str(uuid4()), query.world_id, scope_result, batch_size=10)
+        schema = SchemaGenerator.generate_extraction_schema(
+            query.fact_spec, query.aggregation_spec, record_ids
+        )
+        provider = get_provider(self.provider_id)()
+        extracted_rows: list[dict[str, Any]] = []
+        for unit in plan.units:
+            batch_df = scoped_df[scoped_df["record_id"].isin(unit.record_ids)]
+            prompt = (
+                "Extract facts for the following records:\n"
+                f"{batch_df.to_json(orient='records')}\nReturn JSON."
+            )
+            output = provider.generate(
+                prompt,
+                ProviderConfig(
+                    model_id=self.model_id,
+                    structured_schema=schema,
+                    structured_schema_name="ExtractionOutput",
+                ),
+            )
+            if output.parsed_json:
+                extracted_rows.extend(output.parsed_json.get("extracted_records", []))
+        return extracted_rows
 
     def _execute(
         self,
@@ -103,7 +148,7 @@ class P4FullScopeMERPipeline(AbstractPipeline):
             prompt_hash = "p4_prompt_v1"
 
             cache_key = self.cache.generate_key(
-                self.provider_id, "default", prompt_hash, records_hash, schema_hash, 0
+                self.provider_id, self.model_id, prompt_hash, records_hash, schema_hash, 0
             )
             unit.cache_key = cache_key
 
@@ -123,7 +168,7 @@ class P4FullScopeMERPipeline(AbstractPipeline):
                 prompt = f"Extract facts for the following records:\n{batch_json}\nReturn JSON."
 
                 config = ProviderConfig(
-                    model_id="default",
+                    model_id=self.model_id,
                     structured_schema=schema,
                     structured_schema_name="ExtractionOutput",
                 )

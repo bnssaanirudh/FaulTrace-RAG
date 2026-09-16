@@ -95,13 +95,13 @@ class DeterministicProvider(ModelProvider):
 def _corrupt_numbers(obj: Any):
     if isinstance(obj, dict):
         for k, v in obj.items():
-            if isinstance(v, (int, float)) and not isinstance(v, bool):
+            if isinstance(v, int | float) and not isinstance(v, bool):
                 obj[k] = v + 1000
             else:
                 _corrupt_numbers(v)
     elif isinstance(obj, list):
         for i in range(len(obj)):
-            if isinstance(obj[i], (int, float)) and not isinstance(obj[i], bool):
+            if isinstance(obj[i], int | float) and not isinstance(obj[i], bool):
                 obj[i] = obj[i] + 1000
             else:
                 _corrupt_numbers(obj[i])

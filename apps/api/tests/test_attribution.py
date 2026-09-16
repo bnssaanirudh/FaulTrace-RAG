@@ -2,6 +2,7 @@ from uuid import uuid4
 
 import pandas as pd
 from faulttrace_core.models import GoldAnswer, PipelineRun, QuerySpec
+from faulttrace_gold.oracles import AggregationOracle, ExtractionOracle, ScopeOracle
 from faulttrace_pipelines.lattice import OracleLatticeRunner
 
 
@@ -22,6 +23,66 @@ def _make_dummy_run(answer=10, is_correct=False):
         token_estimate_output=0,
         artifact_references={},
     )
+
+
+def test_full_oracle_preserves_timestamp_types_and_matches_gold():
+    frame = pd.DataFrame(
+        [
+            {"record_id": "a", "event_time": pd.Timestamp("2020-12-31T23:59:59Z")},
+            {"record_id": "b", "event_time": pd.Timestamp("2023-01-01T00:00:00Z")},
+            {"record_id": "c", "event_time": pd.Timestamp("2020-06-01T00:00:00Z")},
+        ]
+    )
+    query = QuerySpec.model_validate(
+        {
+            "family": "comparison",
+            "natural_language_question": "Were there more records in 2020 than 2023?",
+            "scope_predicate": {
+                "kind": "or",
+                "operands": [
+                    {
+                        "kind": "range",
+                        "field": "event_time",
+                        "low": "2020-01-01T00:00:00Z",
+                        "high": "2020-12-31T23:59:59Z",
+                    },
+                    {
+                        "kind": "range",
+                        "field": "event_time",
+                        "low": "2023-01-01T00:00:00Z",
+                        "high": "2023-12-31T23:59:59Z",
+                    },
+                ],
+            },
+            "fact_spec": {"fields": ["record_id", "event_time"]},
+            "aggregation_spec": {
+                "kind": "comparison",
+                "measure": "count",
+                "group_a_predicate": {
+                    "kind": "range",
+                    "field": "event_time",
+                    "low": "2020-01-01T00:00:00Z",
+                    "high": "2020-12-31T23:59:59Z",
+                },
+                "group_b_predicate": {
+                    "kind": "range",
+                    "field": "event_time",
+                    "low": "2023-01-01T00:00:00Z",
+                    "high": "2023-12-31T23:59:59Z",
+                },
+                "output": "difference",
+            },
+            "world_id": "timestamp-world",
+        }
+    )
+
+    scope = ScopeOracle().evaluate(query, frame)
+    supplied = frame[frame["record_id"].isin(scope.record_ids)]
+    extraction = ExtractionOracle().evaluate(query.fact_spec, supplied)
+    result = AggregationOracle().evaluate(query.aggregation_spec, extraction.fact_rows, query)
+
+    assert isinstance(extraction.fact_rows[0]["event_time"], pd.Timestamp)
+    assert result.answer_value == 1.0
 
 
 def test_pure_scope_failure():

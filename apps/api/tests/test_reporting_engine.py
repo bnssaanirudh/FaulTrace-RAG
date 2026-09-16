@@ -79,6 +79,72 @@ def test_reporting_runner():
     assert plan["total_jobs"] >= 0
 
 
+def test_matrix_filters_queries_by_world_dataset():
+    from datetime import UTC, datetime
+
+    from faulttrace_api.database import Base, QueryRow, WorldRow
+    from faulttrace_core.models import CountSpec, EqPredicate, FactSpec, QueryFamily, QuerySpec
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy.pool import StaticPool
+
+    engine = create_engine(
+        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool
+    )
+    Base.metadata.create_all(engine)
+    session = sessionmaker(bind=engine)()
+
+    for dataset_id, world_id in (("dataset-a", "world-a"), ("dataset-b", "world-b")):
+        session.add(
+            WorldRow(
+                world_id=world_id,
+                dataset_id=dataset_id,
+                seed=42,
+                scale_n=10,
+                record_ids_hash=f"records-{dataset_id}",
+                manifest_path=f"{world_id}/manifest.json",
+                created_at=datetime.now(UTC),
+            )
+        )
+        query = QuerySpec(
+            family=QueryFamily.COUNT,
+            natural_language_question=f"How many records are in {dataset_id}?",
+            scope_predicate=EqPredicate(field="category", value="Electronics"),
+            fact_spec=FactSpec(fields=["record_id"]),
+            aggregation_spec=CountSpec(),
+            world_id=world_id,
+            difficulty="easy",
+        )
+        session.add(
+            QueryRow(
+                query_id=query.query_id,
+                world_id=world_id,
+                family=query.family.value,
+                natural_language_question=query.natural_language_question,
+                spec_json=query.model_dump_json(),
+                created_at=datetime.now(UTC),
+            )
+        )
+    session.commit()
+
+    spec = ExperimentSpec(
+        dataset_id="dataset-a",
+        scales=[10],
+        query_families=["count"],
+        difficulty_strata=["easy"],
+        pipelines=["P0-deterministic-scope-baseline"],
+        providers=["deterministic"],
+        models=["deterministic-valid"],
+        seeds=[42],
+        require_gold=False,
+    )
+    jobs = ResumableMatrixRunner(spec, session).expand_matrix()
+    assert len(jobs) == 1
+    assert jobs[0].dataset_id == "dataset-a"
+    assert jobs[0].world_id == "world-a"
+    assert jobs[0].query_spec_hash
+
+
 def test_reporting_figures(tmp_path):
     """Test figure generation with zero samples and missing groups."""
     out_dir = tmp_path / "figs"

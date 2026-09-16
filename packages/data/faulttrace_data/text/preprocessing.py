@@ -4,7 +4,13 @@ Preprocessing and chunking logic.
 
 import re
 import unicodedata
-from typing import Any
+from typing import TypedDict
+
+
+class TextChunk(TypedDict):
+    text: str
+    start_char: int
+    end_char: int
 
 
 def normalize_text(text: str) -> str:
@@ -27,7 +33,7 @@ def detect_language(text: str) -> str:
     # We will assume 'en' for now since the prompt doesn't specify an external dep for this.
     return "en"
 
-def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[dict[str, Any]]:
+def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[TextChunk]:
     """
     Split text into chunks of `chunk_size` characters with `overlap`.
     Returns list of {"text": chunk, "start_char": start, "end_char": end}.
@@ -35,7 +41,7 @@ def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[di
     if not text:
         return []
 
-    chunks = []
+    chunks: list[TextChunk] = []
     start = 0
     text_len = len(text)
 

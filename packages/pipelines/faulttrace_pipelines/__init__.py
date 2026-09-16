@@ -16,8 +16,6 @@ Attribution:
 """
 
 # Ensure LLM providers are registered
-import faulttrace_pipelines.llm.deterministic
-import faulttrace_pipelines.llm.openai_provider
 from faulttrace_pipelines.attribution import (
     AttributionResult,
     ComponentAttribution,
@@ -25,6 +23,8 @@ from faulttrace_pipelines.attribution import (
 )
 from faulttrace_pipelines.base import AbstractPipeline
 from faulttrace_pipelines.gnn_extractor import GNNExtractorPipeline
+from faulttrace_pipelines.llm import deterministic as deterministic
+from faulttrace_pipelines.llm import openai_provider as openai_provider
 from faulttrace_pipelines.p0_baseline import P0DeterministicBaseline
 from faulttrace_pipelines.p1_direct_bm25 import P1DirectBM25Pipeline
 from faulttrace_pipelines.p1_wrong_scope import P1WrongScope
@@ -56,16 +56,34 @@ PIPELINE_REGISTRY: dict[str, type[AbstractPipeline]] = {
 }
 
 
-def get_pipeline(pipeline_id: str, artifacts_dir=None) -> AbstractPipeline:
-    """Instantiate a pipeline by ID."""
+def get_pipeline(
+    pipeline_id: str,
+    artifacts_dir=None,
+    provider_id: str | None = None,
+    model_id: str | None = None,
+) -> AbstractPipeline:
+    """Instantiate a pipeline by ID with supported runtime configuration."""
+    import inspect
+
     cls = PIPELINE_REGISTRY.get(pipeline_id)
     if cls is None:
         raise ValueError(
             f"Unknown pipeline_id: {pipeline_id!r}. Available: {list(PIPELINE_REGISTRY)}"
         )
-    if artifacts_dir is not None:
-        return cls(artifacts_dir=artifacts_dir)
-    return cls()
+    signature = inspect.signature(cls.__init__)
+    supported = signature.parameters
+    kwargs = {}
+    if artifacts_dir is not None and "artifacts_dir" in supported:
+        kwargs["artifacts_dir"] = artifacts_dir
+    if provider_id is not None and "provider_id" in supported:
+        kwargs["provider_id"] = provider_id
+    if model_id is not None and "model_id" in supported:
+        kwargs["model_id"] = model_id
+
+    # Do not overwrite a pipeline's declared runtime identity when its
+    # constructor does not consume provider/model configuration. Provenance
+    # records both requested and actual values, and they must be truthful.
+    return cls(**kwargs)
 
 
 __all__ = [
@@ -82,4 +100,6 @@ __all__ = [
     "QueryFactory",
     "PIPELINE_REGISTRY",
     "get_pipeline",
+    "deterministic",
+    "openai_provider",
 ]

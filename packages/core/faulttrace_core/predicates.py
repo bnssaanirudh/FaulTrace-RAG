@@ -84,9 +84,9 @@ def _sql_literal(value: Any) -> str:
         return "NULL"
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    if isinstance(value, (int, float)):
+    if isinstance(value, int | float):
         return str(value)
-    if isinstance(value, (datetime, date)):
+    if isinstance(value, datetime | date):
         return f"TIMESTAMP '{value.isoformat()}'"
     if isinstance(value, str):
         # Escape single quotes
@@ -178,10 +178,23 @@ class PredicateCompiler:
         col = df[field]
         mask = pd.Series([True] * len(df), index=df.index)
         if pred.low is not None:
-            mask = mask & (col >= pred.low) if pred.low_inclusive else mask & (col > pred.low)
+            low = self._coerce_range_bound(col, pred.low)
+            mask = mask & (col >= low) if pred.low_inclusive else mask & (col > low)
         if pred.high is not None:
-            mask = mask & (col <= pred.high) if pred.high_inclusive else mask & (col < pred.high)
+            high = self._coerce_range_bound(col, pred.high)
+            mask = mask & (col <= high) if pred.high_inclusive else mask & (col < high)
         return mask
+
+    @staticmethod
+    def _coerce_range_bound(col: pd.Series, value: Any) -> Any:
+        """Restore JSON date strings to a value compatible with a datetime Series."""
+        if not pd.api.types.is_datetime64_any_dtype(col.dtype):
+            return value
+        bound = pd.Timestamp(value)
+        series_tz = col.dt.tz
+        if series_tz is not None:
+            return bound.tz_localize(series_tz) if bound.tzinfo is None else bound.tz_convert(series_tz)
+        return bound.tz_localize(None) if bound.tzinfo is not None else bound
 
     # --- SQL compilation ---
 

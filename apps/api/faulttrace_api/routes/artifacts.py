@@ -18,7 +18,7 @@ router = APIRouter()
 @router.get("/artifacts/{artifact_id}/metadata", summary="Get artifact metadata")
 async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db)):
     """Get metadata for a run artifact by run_id."""
-    get_settings()
+    settings = get_settings()
 
     # Check if it's a run artifact
     run = db.query(RunRow).filter(RunRow.run_id == artifact_id).first()
@@ -27,6 +27,10 @@ async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db))
         artifact_info = {}
         for name, path_str in refs.items():
             p = Path(path_str)
+            try:
+                relative_path = str(p.resolve().relative_to(settings.artifacts_root.resolve()))
+            except (OSError, ValueError):
+                relative_path = None
             sha256 = None
             if p.exists():
                 hasher = hashlib.sha256()
@@ -36,7 +40,7 @@ async def get_artifact_metadata(artifact_id: str, db: Session = Depends(get_db))
                 sha256 = hasher.hexdigest()
 
             artifact_info[name] = {
-                "path": path_str,
+                "relative_path": relative_path,
                 "exists": p.exists(),
                 "size_bytes": p.stat().st_size if p.exists() else None,
                 "sha256": sha256,

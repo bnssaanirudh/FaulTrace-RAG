@@ -16,9 +16,14 @@ class IndexManager:
         self, units: list[RetrievalUnit], engine_type: str, config: dict[str, Any], dataset_id: str | None = None
     ) -> str:
         """Generate a stable hash based on corpus contents and index configuration."""
-        # We hash the unit IDs and their lengths as a proxy for corpus state
-        corpus_signature = [(u.unit_id, len(u.text)) for u in units]
-        # Sort to ensure order independence if needed, but normally order is stable
+        # Text length is not a corpus fingerprint: different documents can have the
+        # same IDs and lengths.  Include the ordered content hashes so cached engines
+        # cannot silently cross datasets or corpus revisions.  Order is intentional
+        # because it determines deterministic tie-breaking in the retrievers.
+        corpus_signature = [
+            (u.unit_id, u.record_id, u.content_hash())
+            for u in units
+        ]
         state = {
             "engine_type": engine_type,
             "config": config,

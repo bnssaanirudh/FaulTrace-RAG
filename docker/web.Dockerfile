@@ -2,6 +2,11 @@ FROM node:20-slim AS builder
 
 WORKDIR /app
 
+# Rewrites are compiled during `next build`; use the Compose service hostname
+# inside the image rather than baking localhost into the production manifest.
+ARG INTERNAL_API_URL=http://api:8000
+ENV INTERNAL_API_URL=$INTERNAL_API_URL
+
 COPY package.json package-lock.json* ./
 RUN npm ci --legacy-peer-deps
 
@@ -17,7 +22,6 @@ ENV NODE_ENV=production
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/public ./public 2>/dev/null || true
 
 EXPOSE 3000
 

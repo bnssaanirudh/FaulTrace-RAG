@@ -95,6 +95,14 @@ class ReasonCode(StrEnum):
     TIE_BOUNDARY_UNRESOLVED = "TIE_BOUNDARY_UNRESOLVED"
     TIME_BUCKET_INCOMPLETE = "TIME_BUCKET_INCOMPLETE"
     AGGREGATION_INVALID = "AGGREGATION_INVALID"
+    PROVENANCE_UNVERIFIABLE = "PROVENANCE_UNVERIFIABLE"
+    PROVENANCE_MISMATCH = "PROVENANCE_MISMATCH"
+    FACT_FIDELITY_UNKNOWN = "FACT_FIDELITY_UNKNOWN"
+    FACT_FIDELITY_BELOW_REQUIRED = "FACT_FIDELITY_BELOW_REQUIRED"
+    NUMERIC_FIDELITY_UNKNOWN = "NUMERIC_FIDELITY_UNKNOWN"
+    NUMERIC_FIDELITY_BELOW_REQUIRED = "NUMERIC_FIDELITY_BELOW_REQUIRED"
+    AGGREGATION_REPLAY_UNKNOWN = "AGGREGATION_REPLAY_UNKNOWN"
+    AGGREGATION_REPLAY_MISMATCH = "AGGREGATION_REPLAY_MISMATCH"
     GOLD_NOT_AVAILABLE_FOR_EVALUATION = "GOLD_NOT_AVAILABLE_FOR_EVALUATION"
     CERTIFIED = "CERTIFIED"
 
@@ -602,6 +610,7 @@ class PipelineRun(BaseModel):
     query_id: str
     pipeline_id: str
     provider_id: str = Field(default="deterministic")
+    execution_seed: int = Field(default=0, description="Random seed used by this execution")
 
     started_at: datetime = Field(default_factory=_utcnow)
     completed_at: datetime | None = None
@@ -643,6 +652,8 @@ class PipelineRun(BaseModel):
     abstention_reason: str | None = None
     certificate_id: str | None = None
     certificate_hash: str | None = None
+    certificate_policy_id: str | None = None
+    certificate_assurance_scope: str | None = None
 
     schema_version: str = Field(default=SCHEMA_VERSION)
 
@@ -650,6 +661,7 @@ class PipelineRun(BaseModel):
         data = {
             "pipeline_id": self.pipeline_id,
             "provider_id": self.provider_id,
+            "execution_seed": self.execution_seed,
             "query_spec_hash": query_spec.spec_hash(),
             "query_id": self.query_id,
         }
@@ -784,7 +796,7 @@ class EvidenceRequirement(BaseModel):
     def from_query(cls, query: QuerySpec) -> EvidenceRequirement:
         """Generate conservative requirements from the query spec."""
         req = cls()
-        if isinstance(query.aggregation_spec, (CountSpec, SumSpec, ProportionSpec)):
+        if isinstance(query.aggregation_spec, CountSpec | SumSpec | ProportionSpec):
             req.requires_full_scope = True
         elif isinstance(query.aggregation_spec, TopKSpec):
             req.requires_full_scope = True
@@ -800,6 +812,9 @@ class CoverageObservation(BaseModel):
     known_world_size: int | None = None
     eligible_set_size_known: bool = False
     eligible_set_size: int | None = None
+    scope_membership_known: bool = False
+    eligible_record_ids_covered: int = 0
+    unexpected_record_ids: int = 0
     retrieved_units: int = 0
     unique_represented_record_ids: int = 0
     extracted_valid_rows: int = 0
@@ -813,6 +828,12 @@ class CoverageObservation(BaseModel):
     tie_boundary_completeness: bool = False
     truncation_count: int = 0
     dropped_context_count: int = 0
+    provenance_verifiable: bool = False
+    provenance_coverage: float | None = Field(default=None, ge=0.0, le=1.0)
+    source_fact_fidelity: float | None = Field(default=None, ge=0.0, le=1.0)
+    numeric_fidelity: float | None = Field(default=None, ge=0.0, le=1.0)
+    aggregation_replay_evaluable: bool = False
+    aggregation_replay_consistent: bool | None = None
 
 
 class AnswerPolicyConfig(BaseModel):
@@ -827,6 +848,10 @@ class AnswerPolicyConfig(BaseModel):
     require_ranking_boundary_confidence: bool = True
     max_repair_failures: int = 0
     allow_partial: bool = False
+    require_provenance_verification: bool = False
+    min_source_fact_fidelity: float | None = Field(default=None, ge=0.0, le=1.0)
+    min_numeric_fidelity: float | None = Field(default=None, ge=0.0, le=1.0)
+    require_aggregation_replay: bool = False
 
 
 class CoverageCertificate(BaseModel):
@@ -853,6 +878,9 @@ class CoverageCertificate(BaseModel):
 
     policy_id: str = ""
     policy_version: str = ""
+    assurance_scope: Literal["structural_coverage", "structured_semantic"] = (
+        "structural_coverage"
+    )
 
     artifact_lineage: dict[str, str] = Field(default_factory=dict)
     certificate_hash: str = ""
@@ -866,6 +894,11 @@ class CoverageCertificate(BaseModel):
                 "decision": self.decision.value,
                 "ratios": self.coverage_ratios,
                 "policy_id": self.policy_id,
+                "policy_version": self.policy_version,
+                "assurance_scope": self.assurance_scope,
+                "reason_codes": [code.value for code in self.reason_codes],
+                "unknown_dimensions": self.unknown_dimensions,
+                "observations": self.observations.model_dump(mode="json"),
             }
             object.__setattr__(self, "certificate_hash", _stable_hash(data))
         return self

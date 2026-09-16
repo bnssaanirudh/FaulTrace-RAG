@@ -12,7 +12,6 @@ import {
   XCircle,
   Zap,
   ChevronRight,
-  ArrowRight,
   ShieldCheck,
   AlertTriangle,
   RotateCcw,
@@ -21,7 +20,7 @@ import { api, SystemStatus, World, Run } from '@/lib/api';
 import { StatCard, Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { formatMs, formatDate, statusBadgeClass, familyBadgeClass } from '@/lib/utils';
+import { formatMs } from '@/lib/utils';
 import Link from 'next/link';
 
 type DemoStep =
@@ -207,6 +206,16 @@ export function DashboardPage() {
           </Button>
         </div>
       </div>
+
+      {(seedMsg || error) && (
+        <div className={`mb-6 rounded-lg px-4 py-3 text-sm ring-1 ${
+          error || seedMsg.startsWith('✗')
+            ? 'bg-red-500/10 text-red-300 ring-red-500/25'
+            : 'bg-emerald-500/10 text-emerald-300 ring-emerald-500/25'
+        }`}>
+          {error || seedMsg}
+        </div>
+      )}
 
       {/* Problem Statement Box */}
       <div className="mb-8 rounded-xl border border-orange-500/20 bg-orange-600/5 p-6 backdrop-blur-sm">

@@ -153,6 +153,7 @@ class DeterministicFixtureExtractor(ExtractionProvider):
 
         cited_answer = CitedAnswer(
             answer_text=supporting_quote,
+            answer_value=supporting_quote,
             support_status=support_status,
             cited_doc_ids=[doc_id],
             cited_chunk_ids=[chunk_id] if chunk_id else [],
@@ -165,6 +166,7 @@ class DeterministicFixtureExtractor(ExtractionProvider):
             split=split,
             doc_id=doc_id,
             chunk_id=chunk_id,
+            query_id=None,
             facts=facts,
             cited_answer=cited_answer,
             provider=self.provider_name,
@@ -184,10 +186,13 @@ class DeterministicFixtureExtractor(ExtractionProvider):
                     fact_id=f"{doc_id}_date_{i}",
                     fact_type=FactType.DATE,
                     entity_type=EntityType.DATE,
+                    relation_type=None,
                     normalized_value=match.group(0),
                     surface_text=match.group(0),
                     span=ExtractionSpan(
                         doc_id=doc_id,
+                        chunk_id=None,
+                        sentence_id=None,
                         char_start=start,
                         char_end=end,
                         surface_text=match.group(0),
@@ -195,7 +200,10 @@ class DeterministicFixtureExtractor(ExtractionProvider):
                     ),
                     confidence=0.85,
                     provider="deterministic_fixture",
+                    model_version=self.model_version,
+                    extracted_at=None,
                     validation_status=ValidationStatus.VALID,
+                    rejection_reason=None,
                 )
             )
 
@@ -210,10 +218,13 @@ class DeterministicFixtureExtractor(ExtractionProvider):
                     fact_id=f"{doc_id}_qty_{i}",
                     fact_type=FactType.QUANTITY,
                     entity_type=EntityType.QUANTITY,
+                    relation_type=None,
                     normalized_value=match.group(0).strip(),
                     surface_text=match.group(0),
                     span=ExtractionSpan(
                         doc_id=doc_id,
+                        chunk_id=None,
+                        sentence_id=None,
                         char_start=start,
                         char_end=end,
                         surface_text=match.group(0),
@@ -221,7 +232,10 @@ class DeterministicFixtureExtractor(ExtractionProvider):
                     ),
                     confidence=0.75,
                     provider="deterministic_fixture",
+                    model_version=self.model_version,
+                    extracted_at=None,
                     validation_status=ValidationStatus.VALID,
+                    rejection_reason=None,
                 )
             )
 
@@ -372,6 +386,7 @@ Return a JSON object with these fields:
 
         cited_answer = CitedAnswer(
             answer_text=parsed.get("answer_text"),
+            answer_value=parsed.get("answer_value", parsed.get("answer_text")),
             support_status=support_status,
             cited_doc_ids=[doc_id],
             cited_chunk_ids=[chunk_id] if chunk_id else [],
@@ -384,6 +399,7 @@ Return a JSON object with these fields:
             split=split,
             doc_id=doc_id,
             chunk_id=chunk_id,
+            query_id=None,
             cited_answer=cited_answer,
             provider=self.provider_name,
             model_version=self.model_version,
@@ -527,8 +543,10 @@ class BoundedRepairExtractor(ExtractionProvider):
         # CitedAnswer with explicit INSUFFICIENT_EVIDENCE (not invented doc)
         cited_answer = CitedAnswer(
             answer_text=None,
+            answer_value=None,
             support_status=SupportStatus.INSUFFICIENT_EVIDENCE,
             cited_doc_ids=[],  # Empty — no invented IDs
+            supporting_quote=None,
             abstention_reason=f"Extraction rejected: {rejection_reason[:200]}",
         )
         return ExtractionRecord(
@@ -536,6 +554,7 @@ class BoundedRepairExtractor(ExtractionProvider):
             split=split,
             doc_id=doc_id,
             chunk_id=chunk_id,
+            query_id=None,
             facts=[],
             cited_answer=cited_answer,
             provider=self.provider_name,

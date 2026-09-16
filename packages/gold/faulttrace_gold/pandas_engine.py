@@ -108,6 +108,10 @@ class PandasEvaluator:
 
         return result_df
 
+    def extract_facts(self, fact_spec: FactSpec, df: pd.DataFrame) -> pd.DataFrame:
+        """Public component boundary used by deterministic pipeline replay."""
+        return self._apply_fact_spec(fact_spec, df)
+
     def _aggregate(
         self,
         agg_spec: AggregationSpec,

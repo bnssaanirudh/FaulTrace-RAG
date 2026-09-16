@@ -1,24 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api, Run, TraceEvent } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Activity,
   CheckCircle2,
-  XCircle,
   Clock,
   Database,
-  ShieldAlert,
   ShieldCheck,
   TrendingUp,
   Download,
   Terminal,
-  FileSpreadsheet,
-  AlertTriangle,
-  HelpCircle,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,7 +27,7 @@ export default function TracePage({ runId }: { runId: string }) {
   // Selected trace stage tab
   const [selectedStage, setSelectedStage] = useState<string>('scope_enumerate');
 
-  async function fetchData() {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -55,11 +49,11 @@ export default function TracePage({ runId }: { runId: string }) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [runId]);
 
   useEffect(() => {
-    fetchData();
-  }, [runId]);
+    void fetchData();
+  }, [fetchData]);
 
   if (loading) return <div className="p-8 text-slate-500">Loading trace info...</div>;
   if (error) return <div className="p-8 text-red-400">Error loading trace: {error}</div>;
@@ -264,10 +258,9 @@ export default function TracePage({ runId }: { runId: string }) {
                   { key: 'ea', label: 'E + A' },
                   { key: 'rea', label: 'REA (Oracle)' },
                 ].map((node) => {
-                  // Map database keys to results from intervention execution
-                  // In case exact lattice data list is absent, simulate margins cleanly based on Shapley values
                   const isGold = node.key === 'rea';
                   const isBase = node.key === 'none';
+                  const intervention = attribution.interventions?.[node.key];
                   return (
                     <div
                       key={node.key}
@@ -281,10 +274,10 @@ export default function TracePage({ runId }: { runId: string }) {
                     >
                       <span className="block text-[10px] text-slate-500 uppercase font-semibold">{node.label}</span>
                       <span className="block font-mono text-xs font-bold text-white mt-1">
-                        {isGold ? String(run.gold_answer_value).slice(0, 8) : isBase ? String(run.answer).slice(0, 8) : 'Simulated'}
+                        {intervention ? String(intervention.answer_value).slice(0, 8) : 'Unavailable'}
                       </span>
                       <Badge variant={isGold ? 'success' : isBase ? 'error' : 'neutral'} className="mt-2 text-[9px]">
-                        {isGold ? '0.00 loss' : isBase ? `${run.loss?.toFixed(2)} loss` : '—'}
+                        {intervention ? `${Number(intervention.normalized_loss).toFixed(2)} loss` : 'not persisted'}
                       </Badge>
                     </div>
                   );
@@ -359,20 +352,20 @@ export default function TracePage({ runId }: { runId: string }) {
                       <tr className="border-b border-white/[0.04]">
                         <td className="px-3 py-2 font-semibold">Scope Coverage</td>
                         <td className="px-3 py-2">100% full bounds</td>
-                        <td className="px-3 py-2">Simulated</td>
-                        <td className="px-3 py-2"><Badge variant="success">Pass</Badge></td>
+                        <td className="px-3 py-2">Not persisted</td>
+                        <td className="px-3 py-2"><Badge variant="neutral">Unavailable</Badge></td>
                       </tr>
                       <tr className="border-b border-white/[0.04]">
                         <td className="px-3 py-2 font-semibold">Extraction Rows</td>
                         <td className="px-3 py-2">No missing values</td>
-                        <td className="px-3 py-2">Simulated</td>
-                        <td className="px-3 py-2"><Badge variant="success">Pass</Badge></td>
+                        <td className="px-3 py-2">Not persisted</td>
+                        <td className="px-3 py-2"><Badge variant="neutral">Unavailable</Badge></td>
                       </tr>
                       <tr>
                         <td className="px-3 py-2 font-semibold">Tie Resolution</td>
                         <td className="px-3 py-2">Resolved boundary</td>
-                        <td className="px-3 py-2">Verified</td>
-                        <td className="px-3 py-2"><Badge variant="success">Pass</Badge></td>
+                        <td className="px-3 py-2">Not persisted</td>
+                        <td className="px-3 py-2"><Badge variant="neutral">Unavailable</Badge></td>
                       </tr>
                     </tbody>
                   </table>

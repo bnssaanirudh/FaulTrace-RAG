@@ -167,6 +167,5 @@ def get_db():
 
 
 def init_db():
-    """Create all tables if they don't exist. Now delegated to Alembic."""
-    get_engine()
-    # Base.metadata.create_all(engine)
+    """Ensure a fresh local database is usable; deployments still run Alembic first."""
+    Base.metadata.create_all(get_engine())

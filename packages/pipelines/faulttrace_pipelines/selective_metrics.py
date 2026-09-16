@@ -87,37 +87,29 @@ def evaluate_certification_policy(runs: list[PipelineRun]) -> PolicyEvaluationRe
 
 
 def generate_risk_coverage_curve(runs: list[PipelineRun]) -> list[dict[str, Any]]:
-    """
-    Generates a generic risk-coverage curve by sweeping the scope coverage threshold.
-    For this, we re-evaluate runs at different threshold levels.
-    """
+    """Return measured operating points; no unobserved threshold sweep is fabricated."""
+    if not runs:
+        return []
 
-    from faulttrace_core.models import AnswerPolicyConfig
+    evaluable = [run for run in runs if run.is_correct is not None]
+    answered = [
+        run
+        for run in evaluable
+        if run.policy_decision == CoverageDecision.CERTIFIED.value
+    ]
 
-    thresholds = [1.0, 0.9, 0.8, 0.5, 0.0]
-    curve = []
+    def point(label: str, selected: list[PipelineRun]) -> dict[str, Any]:
+        losses = [float(run.loss) for run in selected if run.loss is not None]
+        return {
+            "label": label,
+            "coverage_rate": len(selected) / len(evaluable) if evaluable else 0.0,
+            "risk": sum(losses) / len(losses) if losses else None,
+            "selective_accuracy": (
+                sum(1 for run in selected if run.is_correct is True) / len(selected)
+                if selected
+                else None
+            ),
+            "measurement_status": "measured",
+        }
 
-    # This requires full reconstruction if we don't have the original observations
-    # In a real system, we'd persist the observations inside the PipelineRun or Certificate.
-    # For now, we simulate the curve using the baseline metrics.
-
-    for t in thresholds:
-        AnswerPolicyConfig(
-            policy_id=f"sweep_{t}",
-            min_known_scope_coverage=t,
-            min_extraction_completeness=t,
-            min_required_field_completeness=t,
-        )
-
-        # We would re-evaluate the certificates here.
-        # But we don't have the corpus_df to re-run extract_coverage_observations easily.
-        # This is a stub implementation for the curve.
-        curve.append(
-            {
-                "threshold": t,
-                "coverage_rate": t,  # Placeholder
-                "risk": 1.0 - t,  # Placeholder
-            }
-        )
-
-    return curve
+    return [point("raw_evaluable", evaluable), point("applied_policy", answered)]

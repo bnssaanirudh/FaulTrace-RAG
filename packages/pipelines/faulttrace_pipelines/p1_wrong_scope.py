@@ -151,7 +151,7 @@ class P1WrongScope(AbstractPipeline):
 
         # ── Stage 2: scope_enumerate (FAULTY) ──
         t1 = time.perf_counter()
-        rng = random.Random(str(query.query_id))
+        rng = self.fault_rng(query, "scope")
         wrong_pred = _perturb_predicate(query.scope_predicate, rng)
 
         # Apply wrong predicate
@@ -195,7 +195,8 @@ class P1WrongScope(AbstractPipeline):
         t2 = time.perf_counter()
         fields = query.fact_spec.fields
         avail = [f for f in fields if f in scope_df.columns]
-        extraction_df = scope_df[avail].copy() if avail else scope_df.copy()
+        lineage_fields = (["record_id"] if "record_id" in scope_df.columns else []) + avail
+        extraction_df = scope_df[list(dict.fromkeys(lineage_fields))].copy()
         extract_duration = (time.perf_counter() - t2) * 1000
 
         events.append(

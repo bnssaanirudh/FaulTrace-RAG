@@ -18,10 +18,12 @@ class Settings(BaseSettings):
 
     # API
     cors_origins: str = "http://localhost:3000"
-    api_host: str = "0.0.0.0"
+    api_host: str = "127.0.0.1"
     api_port: int = 8000
     debug: bool = False
     log_level: str = "INFO"
+    trusted_ingest_roots: str = ""
+    allow_provider_connectivity_tests: bool = False
 
     # Database
     database_url: str = ""  # empty = use SQLite at db_path

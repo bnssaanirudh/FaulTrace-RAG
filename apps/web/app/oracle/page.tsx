@@ -19,7 +19,7 @@ import {
   Info,
 } from 'lucide-react';
 import Link from 'next/link';
-import { formatMs, formatDate } from '@/lib/utils';
+import { formatMs } from '@/lib/utils';
 
 interface Attribution {
   run_id: string;

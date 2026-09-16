@@ -5,8 +5,11 @@ Reproducibility Bundle: packages experiment configurations, lock files, metric C
 from __future__ import annotations
 
 import hashlib
+import importlib.metadata
 import json
+import platform
 import sys
+import zipfile
 from pathlib import Path
 from typing import Any
 
@@ -26,34 +29,77 @@ class ReproducibilityBundle:
         config_path = bundle_dir / "resolved_config.json"
         config_path.write_text(json.dumps(spec_dict, indent=2))
 
-        # 2. Package Lock Info (freeze sys.modules)
+        # 2. Installed distributions. Reading package module attributes is both
+        # incomplete and capable of emitting deprecation warnings.
         lock_path = bundle_dir / "env_packages.lock"
-        packages_info = []
-        for p in list(sys.modules.keys()):
-            try:
-                mod = sys.modules[p]
-                if hasattr(mod, "__version__"):
-                    packages_info.append(f"{p}=={mod.__version__}")
-            except Exception:
-                pass
-        lock_path.write_text("\n".join(sorted(set(packages_info))))
+        packages_info = sorted(
+            {
+                f"{name}=={distribution.version}"
+                for distribution in importlib.metadata.distributions()
+                if (name := distribution.metadata["Name"])
+            }
+        )
+        lock_path.write_text("\n".join(packages_info) + "\n", encoding="utf-8")
 
         # 3. Metrics CSV
         metrics_csv = bundle_dir / "metrics.csv"
         metrics_df.to_csv(metrics_csv, index=False)
 
-        # 4. Fingerprint details
+        # 4. Fingerprint actual source and lock state. Never emit fabricated
+        # API or prompt hashes in a reproducibility bundle.
         fingerprint_path = bundle_dir / "fingerprints.json"
+        repository_root = Path(__file__).resolve().parents[3]
+        denied_source_parts = {
+            ".next",
+            ".next-verify",
+            "node_modules",
+            "__pycache__",
+            "artifacts",
+            "outputs",
+            "dist",
+        }
+        source_files = sorted(
+            path
+            for base in (repository_root / "apps", repository_root / "packages", repository_root / "scripts")
+            if base.exists()
+            for path in base.rglob("*")
+            if path.is_file()
+            and not denied_source_parts.intersection(path.relative_to(repository_root).parts)
+            and path.suffix in {".py", ".ts", ".tsx", ".js", ".mjs", ".R"}
+        )
+        source_hasher = hashlib.sha256()
+        for source_path in source_files:
+            source_hasher.update(source_path.relative_to(repository_root).as_posix().encode("utf-8"))
+            source_hasher.update(b"\0")
+            source_hasher.update(source_path.read_bytes())
+
+        dependency_lock = repository_root / "requirements.lock.txt"
         fingerprints = {
             "os": sys.platform,
+            "platform": platform.platform(),
             "python_version": sys.version,
-            "api_hash": "sha256_mock_api_v1_validated",
-            "prompt_hashes": {
-                "P1-wrong-scope": "sha256_p1_scope_perturbation_v1",
-                "P4-compound-scope-facts": "sha256_p4_compound_v1",
-            },
+            "source_tree_sha256": source_hasher.hexdigest(),
+            "source_file_count": len(source_files),
+            "requirements_lock_sha256": (
+                hashlib.sha256(dependency_lock.read_bytes()).hexdigest()
+                if dependency_lock.exists()
+                else None
+            ),
         }
-        fingerprint_path.write_text(json.dumps(fingerprints, indent=2))
+        fingerprint_path.write_text(
+            json.dumps(fingerprints, indent=2, sort_keys=True), encoding="utf-8"
+        )
+
+        # Capture the exact source bytes used by the run, including uncommitted
+        # files. A hash without a recoverable snapshot is insufficient when the
+        # working tree is dirty.
+        source_snapshot_path = bundle_dir / "source_snapshot.zip"
+        with zipfile.ZipFile(source_snapshot_path, "w", zipfile.ZIP_DEFLATED) as snapshot:
+            for source_path in source_files:
+                snapshot.write(
+                    source_path,
+                    source_path.relative_to(repository_root).as_posix(),
+                )
 
         # 5. Checksum files
         checksums = {}
@@ -62,6 +108,7 @@ class ReproducibilityBundle:
             "env_packages.lock",
             "metrics.csv",
             "fingerprints.json",
+            "source_snapshot.zip",
         ]:
             f_path = bundle_dir / f_name
             if f_path.exists():

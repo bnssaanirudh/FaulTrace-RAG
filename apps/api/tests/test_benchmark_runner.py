@@ -1,4 +1,7 @@
+from faulttrace_core.retrieval import RetrievalUnit
+from faulttrace_core.retrieval_index import index_manager
 from faulttrace_pipelines.text_pipelines.benchmark_runner import BenchmarkRunner
+from faulttrace_pipelines.text_pipelines.p_text_retrieve import PTextRetrieve
 
 
 class MockPipeline:
@@ -44,3 +47,29 @@ def test_benchmark_runner_robustness(tmp_path):
 
     # Metrics should be computed for valid queries
     assert "retrieval_metrics" in res
+
+
+def test_benchmark_runner_calls_real_retrieval_pipeline(tmp_path):
+    """Exercise the production call contract rather than only a permissive mock."""
+    index_manager.clear()
+    units = [
+        RetrievalUnit(unit_id="d1", record_id="d1", text="alpha evidence"),
+        RetrievalUnit(unit_id="d2", record_id="d2", text="beta evidence"),
+        RetrievalUnit(unit_id="d3", record_id="d3", text="gamma evidence"),
+    ]
+    runner = BenchmarkRunner(
+        pipeline=PTextRetrieve(retriever_type="bm25", top_k=1),
+        dataset_id="contract-fixture",
+        artifacts_dir=tmp_path / "artifacts",
+    )
+
+    result = runner.run_all(
+        {"q1": "alpha"},
+        units,
+        qrels={"q1": {"d1": 1}},
+        split="test",
+    )
+
+    assert result["successful"] == 1
+    assert result["failed"] == 0
+    assert result["retrieval_metrics"]["recall@1"] == 1.0

@@ -123,7 +123,15 @@ class TestQueryGeneration:
 
         factory = QueryFactory(data_dir=data_dir)
         queries = factory.generate_for_world(world_id=world_id, target_count=60)
-        assert len(queries) > 0
+        assert len(queries) == 60
+
+    def test_generate_honors_non_divisible_target(self, world_dir):
+        data_dir, world_id = world_dir
+        from faulttrace_pipelines.query_factory import QueryFactory
+
+        factory = QueryFactory(data_dir=data_dir)
+        queries = factory.generate_for_world(world_id=world_id, target_count=61)
+        assert len(queries) == 61
 
     def test_queries_cover_all_families(self, world_dir):
         data_dir, world_id = world_dir
@@ -192,6 +200,19 @@ class TestBenchmarkPack:
         pack = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=False)
         assert pack.total_count > 0
         assert pack.world_id == world_id
+        assert pack.gold_ready is False
+
+    def test_gold_ready_requires_every_query_to_agree(self, world_dir):
+        data_dir, world_id = world_dir
+        from faulttrace_pipelines.query_factory import QueryFactory
+
+        factory = QueryFactory(data_dir=data_dir)
+        pack = factory.build_benchmark_pack(world_id=world_id, total_count=60, validate_gold=True)
+        assert pack.total_count == 60
+        assert pack.agreed_count == pack.total_count
+        assert pack.disagreed_count == 0
+        assert pack.skipped_count == 0
+        assert pack.gold_ready is True
 
     def test_splits_sum_to_total(self, world_dir):
         data_dir, world_id = world_dir

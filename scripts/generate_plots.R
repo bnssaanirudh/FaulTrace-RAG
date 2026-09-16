@@ -1,102 +1,65 @@
 #!/usr/bin/env Rscript
-#
-# Script to generate publication-ready plots for FaultTrace-RAG Diagnostics.
-# Output formats: .pdf and .svg
-#
 
-if (!requireNamespace("ggplot2", quietly = TRUE)) install.packages("ggplot2")
-if (!requireNamespace("arrow", quietly = TRUE)) install.packages("arrow")
-if (!requireNamespace("dplyr", quietly = TRUE)) install.packages("dplyr")
-if (!requireNamespace("tidyr", quietly = TRUE)) install.packages("tidyr")
-if (!requireNamespace("svglite", quietly = TRUE)) install.packages("svglite")
+# Generate figures exclusively from a verified experiment CSV. This script
+# deliberately fails when measured or provenance columns are absent.
+
+required_packages <- c("ggplot2", "dplyr", "tidyr", "svglite")
+missing_packages <- required_packages[!vapply(required_packages, requireNamespace, logical(1), quietly = TRUE)]
+if (length(missing_packages) > 0) stop("Missing R packages: ", paste(missing_packages, collapse = ", "))
 
 library(ggplot2)
-library(arrow)
 library(dplyr)
 library(tidyr)
 library(svglite)
 
-# Create output directories
-out_dir <- "artifacts/figures"
-if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+args <- commandArgs(trailingOnly = TRUE)
+input_file <- if (length(args) >= 1) args[[1]] else "outputs/verified/experiment_runs.csv"
+out_dir <- if (length(args) >= 2) args[[2]] else "artifacts/figures"
+if (!file.exists(input_file)) stop("Verified experiment CSV not found: ", input_file)
+dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 
-theme_publication <- function(...) {
-  theme_minimal(base_size = 14, base_family = "sans") +
-    theme(
-      plot.title = element_text(face = "bold", size = 16, hjust = 0.5),
-      axis.title = element_text(face = "bold"),
-      legend.position = "bottom",
-      panel.grid.minor = element_blank(),
-      panel.background = element_rect(fill = "white", color = NA),
-      plot.background = element_rect(fill = "white", color = NA),
-      ...
-    )
+runs <- read.csv(input_file, check.names = FALSE)
+provenance_columns <- c("experiment_config_hash", "dataset_id", "query_spec_hash", "pipeline_id")
+missing_provenance <- setdiff(provenance_columns, names(runs))
+if (length(missing_provenance) > 0) stop("Input is not provenance-complete; missing: ", paste(missing_provenance, collapse = ", "))
+
+save_plot <- function(name, plot, width = 8, height = 6) {
+  ggsave(file.path(out_dir, paste0(name, ".pdf")), plot, width = width, height = height)
+  ggsave(file.path(out_dir, paste0(name, ".svg")), plot, width = width, height = height)
 }
 
-save_plot <- function(filename, plot, width=8, height=6) {
-  ggsave(file.path(out_dir, paste0(filename, ".pdf")), plot, width=width, height=height, device="pdf")
-  ggsave(file.path(out_dir, paste0(filename, ".svg")), plot, width=width, height=height, device="svg")
-  message("Saved: ", filename)
+if (all(c("scale_n", "is_correct") %in% names(runs))) {
+  accuracy <- runs %>% filter(!is.na(is_correct)) %>% group_by(scale_n, pipeline_id) %>%
+    summarise(accuracy = mean(as.logical(is_correct)), n = n(), .groups = "drop")
+  write.csv(accuracy, file.path(out_dir, "accuracy_scale_degradation.csv"), row.names = FALSE)
+  save_plot("accuracy_scale_degradation", ggplot(accuracy, aes(scale_n, accuracy, color = pipeline_id)) +
+    geom_line() + geom_point() + scale_x_log10() +
+    labs(title = "Measured Accuracy by Corpus Scale", x = "Corpus size", y = "Accuracy") + theme_minimal())
 }
 
-# --- 1. Accuracy-scale degradation curves ---
-# We mock the data aggregation across N since reading raw parquet might fail if data isn't present
-N_values <- c(10, 50, 200, 1000, 2000, 5000)
-pipelines <- c("P0-deterministic-scope-baseline", "P1-wrong-scope", "P2-wrong-facts", "P3-wrong-aggregation", "P5-full-compound")
+phi_columns <- c("phi_scope", "phi_facts", "phi_aggregation")
+if (all(c("scale_n", phi_columns) %in% names(runs))) {
+  shapley <- runs %>% select(scale_n, all_of(phi_columns)) %>%
+    pivot_longer(all_of(phi_columns), names_to = "component", values_to = "shapley_value") %>%
+    filter(!is.na(shapley_value)) %>% group_by(scale_n, component) %>%
+    summarise(mean_shapley = mean(shapley_value), n = n(), .groups = "drop")
+  write.csv(shapley, file.path(out_dir, "shapley_by_scale.csv"), row.names = FALSE)
+  save_plot("shapley_stacked_bar", ggplot(shapley, aes(factor(scale_n), mean_shapley, fill = component)) +
+    geom_col() + labs(title = "Measured Shapley Attribution", x = "Corpus size", y = "Mean Shapley value") + theme_minimal())
+}
 
-set.seed(42)
-accuracy_data <- expand.grid(N = N_values, Pipeline = pipelines)
-accuracy_data$Accuracy <- runif(nrow(accuracy_data), 0.5, 0.95)
-# Make accuracy degrade as N increases for faulty pipelines
-accuracy_data$Accuracy <- accuracy_data$Accuracy - (log10(accuracy_data$N) / 10)
-# Baseline stays high
-accuracy_data$Accuracy[accuracy_data$Pipeline == "P0-deterministic-scope-baseline"] <- 
-  runif(length(N_values), 0.95, 1.0)
+if (all(c("policy_decision", "loss") %in% names(runs))) {
+  evaluable <- runs %>% filter(!is.na(loss))
+  certified <- evaluable %>% filter(policy_decision == "certified")
+  risk <- data.frame(
+    operating_point = c("raw", "applied_policy"),
+    coverage = c(1, if (nrow(evaluable) > 0) nrow(certified) / nrow(evaluable) else 0),
+    risk = c(mean(evaluable$loss), if (nrow(certified) > 0) mean(certified$loss) else NA)
+  )
+  write.csv(risk, file.path(out_dir, "risk_coverage.csv"), row.names = FALSE)
+  save_plot("abstention_risk_coverage", ggplot(risk, aes(coverage, risk, label = operating_point)) +
+    geom_line() + geom_point() + geom_text(vjust = -0.5) +
+    labs(title = "Measured Policy Operating Points", x = "Coverage", y = "Mean loss") + theme_minimal())
+}
 
-p1 <- ggplot(accuracy_data, aes(x = N, y = Accuracy, color = Pipeline, shape = Pipeline)) +
-  geom_line(size = 1) +
-  geom_point(size = 3) +
-  scale_x_log10(breaks = N_values) +
-  labs(title = "Accuracy Degradation over Scale (N)", x = "Corpus Size (N) [log scale]", y = "Exact Match Accuracy") +
-  theme_publication()
-
-save_plot("accuracy_scale_degradation", p1)
-
-# --- 2. Stacked bar charts of Shapley attribution ---
-shapley_data <- data.frame(
-  N = rep(as.factor(N_values), each=3),
-  Component = rep(c("Phi_R (Retrieval)", "Phi_E (Extractor)", "Phi_A (Aggregator)"), length(N_values)),
-  Attribution = runif(3 * length(N_values), 0.1, 0.6)
-)
-# Normalize to sum to 1 per N
-shapley_data <- shapley_data %>% 
-  group_by(N) %>% 
-  mutate(Attribution = Attribution / sum(Attribution)) %>%
-  ungroup()
-
-p2 <- ggplot(shapley_data, aes(x = N, y = Attribution, fill = Component)) +
-  geom_bar(stat = "identity") +
-  scale_fill_brewer(palette = "Set2") +
-  labs(title = "Shapley Attribution Distributions", x = "Corpus Size (N)", y = "Relative Fault Attribution (\u03D5)") +
-  theme_publication()
-
-save_plot("shapley_stacked_bar", p2)
-
-# --- 3. Abstention risk-coverage curves ---
-risk_thresholds <- seq(0.01, 0.5, by = 0.05)
-coverage_data <- data.frame(
-  RiskThreshold = risk_thresholds,
-  Coverage = 1 - exp(-10 * risk_thresholds) # mock logistic-like curve
-)
-
-p3 <- ggplot(coverage_data, aes(x = RiskThreshold, y = Coverage)) +
-  geom_line(size = 1.2, color = "#2c3e50") +
-  geom_point(size = 3, color = "#e74c3c") +
-  labs(title = "Abstention Risk-Coverage Curve (Track T)", 
-       x = "Lexical Ambiguity Tolerance Threshold", 
-       y = "Certification Coverage Ratio") +
-  theme_publication()
-
-save_plot("abstention_risk_coverage", p3)
-
-message("All plots generated successfully in ", out_dir)
+message("Generated only plots supported by measured columns in ", input_file)

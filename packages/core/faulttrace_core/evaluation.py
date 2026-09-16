@@ -113,7 +113,9 @@ def ndcg_at_k(
 
 
 def evaluate_retrieval(
-    results: dict[str, list[str]], qrels: dict[str, dict[str, int]], k_values: list[int] = None
+    results: dict[str, list[str]],
+    qrels: dict[str, dict[str, int]],
+    k_values: list[int] | None = None,
 ) -> dict[str, Any]:
     """Calculate a standard suite of retrieval metrics."""
     if k_values is None:

@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Database, ShieldCheck, FileSpreadsheet, Trash2, CheckCircle2, AlertTriangle, PlayCircle } from 'lucide-react';
+import { Database, ShieldCheck, FileSpreadsheet, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
 export default function DatasetsPage() {
@@ -24,7 +24,23 @@ export default function DatasetsPage() {
   const [ingesting, setIngesting] = useState(false);
   const [ingestStatus, setIngestStatus] = useState('');
 
-  async function load() {
+  const selectSnapshot = useCallback(async (id: string) => {
+    try {
+      const snap = await api.getDatasetSnapshot(id);
+      setSelectedSnapshot(snap);
+      setValidationReport(null);
+
+      const miss = await api.getDatasetMissingness(id);
+      setMissingness(miss);
+
+      const val = await api.validateDatasetSnapshot(id);
+      setValidationReport(val);
+    } catch (e: unknown) {
+      console.error(e);
+    }
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -38,25 +54,7 @@ export default function DatasetsPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function selectSnapshot(id: string) {
-    try {
-      const snap = await api.getDatasetSnapshot(id);
-      setSelectedSnapshot(snap);
-      setValidationReport(null);
-
-      // Fetch missingness
-      const miss = await api.getDatasetMissingness(id);
-      setMissingness(miss);
-
-      // Validate snapshot integrity
-      const val = await api.validateDatasetSnapshot(id);
-      setValidationReport(val);
-    } catch (e: any) {
-      console.error(e);
-    }
-  }
+  }, [selectSnapshot]);
 
   async function handleIngest(e: React.FormEvent) {
     e.preventDefault();
@@ -79,8 +77,8 @@ export default function DatasetsPage() {
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   return (
     <div className="p-8 animate-fade-in text-slate-100">

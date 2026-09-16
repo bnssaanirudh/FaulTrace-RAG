@@ -104,6 +104,10 @@ class P3WrongAggregation(AbstractPipeline):
     pipeline_id = PIPELINE_ID
     provider_id = PROVIDER_ID
 
+    def replay_aggregation(self, query: QuerySpec, extracted_rows: list[dict[str, Any]]) -> Any:
+        correct_answer = super().replay_aggregation(query, extracted_rows)
+        return _corrupt_answer(correct_answer, query, self.fault_rng(query, "aggregation"))
+
     def _execute(
         self,
         run_id: str,
@@ -152,7 +156,8 @@ class P3WrongAggregation(AbstractPipeline):
         t2 = time.perf_counter()
         fields = query.fact_spec.fields
         avail = [f for f in fields if f in scope_df.columns]
-        extraction_df = scope_df[avail].copy() if avail else scope_df.copy()
+        lineage_fields = (["record_id"] if "record_id" in scope_df.columns else []) + avail
+        extraction_df = scope_df[list(dict.fromkeys(lineage_fields))].copy()
         extract_duration = (time.perf_counter() - t2) * 1000
 
         events.append(
@@ -175,7 +180,7 @@ class P3WrongAggregation(AbstractPipeline):
         correct_result = _eval.evaluate(query, df)
         correct_answer = correct_result.get("result")
 
-        rng = random.Random(str(query.query_id))
+        rng = self.fault_rng(query, "aggregation")
         answer_value = _corrupt_answer(correct_answer, query, rng)
         agg_duration = (time.perf_counter() - t3) * 1000
 

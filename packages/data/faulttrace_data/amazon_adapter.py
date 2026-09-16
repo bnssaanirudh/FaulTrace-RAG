@@ -50,8 +50,9 @@ import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 from faulttrace_core.models import CorpusRecord, RecordCategory
-from faulttrace_data.snapshot import DatasetSnapshot
 from pydantic import BaseModel, Field
+
+from faulttrace_data.snapshot import DatasetSnapshot
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +176,7 @@ def _parse_timestamp(raw: Any, field_name: str = "timestamp") -> datetime | None
     """
     if raw is None:
         return None
-    if isinstance(raw, (int, float)):
+    if isinstance(raw, int | float):
         # Unix epoch
         try:
             return datetime.fromtimestamp(raw, tz=UTC)
@@ -629,7 +630,6 @@ class AmazonLocalAdapter:
         source_hash = _file_sha256(source_path)
 
         # Build summary statistics from accepted records
-        cat_counts: dict[str, int] = {}
         # (We'd need to re-read Parquet for full stats; compute from report)
 
         # Build DatasetSnapshot

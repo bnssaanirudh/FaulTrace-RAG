@@ -67,6 +67,53 @@ def test_get_run_certificate(setup_db):
     assert cert_data["raw_answer"] == "raw answer"
 
 
+def test_leaderboard_aggregates_boolean_accuracy(setup_db):
+    from datetime import datetime
+
+    db = testing_session_local()
+    db.add_all(
+        [
+            RunRow(
+                run_id="leaderboard_correct",
+                query_id="query_1",
+                pipeline_id="pipeline_a",
+                started_at=datetime.utcnow(),
+                is_correct=True,
+                loss=0.0,
+                latency_ms=10.0,
+            ),
+            RunRow(
+                run_id="leaderboard_incorrect",
+                query_id="query_2",
+                pipeline_id="pipeline_a",
+                started_at=datetime.utcnow(),
+                is_correct=False,
+                loss=1.0,
+                latency_ms=30.0,
+            ),
+        ]
+    )
+    db.commit()
+    db.close()
+
+    response = client.get("/api/v1/leaderboard")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "leaderboard": [
+            {
+                "pipeline_id": "pipeline_a",
+                "total_runs": 2,
+                "correct_runs": 1,
+                "accuracy": 0.5,
+                "mean_loss": 0.5,
+                "mean_latency_ms": 20.0,
+            }
+        ],
+        "total_pipelines": 1,
+    }
+
+
 def test_create_run_and_retrieve_trace():
     payload = {
         "pipeline_id": "P0-deterministic-scope-baseline",

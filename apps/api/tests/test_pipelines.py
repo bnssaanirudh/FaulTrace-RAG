@@ -13,6 +13,7 @@ Validates:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pandas as pd
@@ -26,7 +27,9 @@ from faulttrace_core.models import (
     QueryFamily,
     QuerySpec,
     RangePredicate,
+    TopKSpec,
 )
+from faulttrace_core.predicates import compiler
 from faulttrace_gold.validator import GoldValidator
 from faulttrace_pipelines import (
     PIPELINE_REGISTRY,
@@ -39,6 +42,8 @@ from faulttrace_pipelines import (
     P5FullCompound,
     get_pipeline,
 )
+from faulttrace_pipelines.attribution import _fact_rows_agree, diagnose_component_artifacts
+from faulttrace_pipelines.p2_wrong_facts import _corrupt_dataframe, _overlay_corrupted_fields
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -159,6 +164,27 @@ def test_p0_correct_on_mean(sample_df, mean_query, gold_mean, tmp_path):
     run, events, _ = p0.run(query=mean_query, df=sample_df, gold_answer=gold_mean)
     assert run.status.value == "completed"
     assert run.is_correct is True
+
+
+def test_p0_persists_typed_structured_answer(sample_df, tmp_path, parquet_path):
+    query = QuerySpec(
+        family=QueryFamily.TOP_K,
+        natural_language_question="Which three brands have the most records?",
+        scope_predicate=RangePredicate(field="rating", low=1.0, high=5.0),
+        fact_spec=FactSpec(fields=["record_id", "brand"]),
+        aggregation_spec=TopKSpec(group_by_field="brand", measure="count", k=3),
+        world_id="test_world",
+    )
+    gold = GoldValidator().validate(query, sample_df, parquet_path).gold_answer
+    run, _, _ = P0DeterministicBaseline(tmp_path / "p0_typed").run(
+        query, sample_df, gold, parquet_path
+    )
+    payload = json.loads(
+        Path(run.artifact_references["aggregation_result"]).read_text(encoding="utf-8")
+    )
+
+    assert isinstance(payload["result"], list)
+    assert isinstance(payload["result"][0], dict)
 
 
 def test_p0_has_6_stages(sample_df, count_query, gold_count, tmp_path):
@@ -320,6 +346,8 @@ def test_attribution_p0_correct_answer(sample_df, count_query, gold_count, tmp_p
 
     assert result.is_correct is True
     assert result.total_error < 1e-6
+    assert result.outcome_active_faults == []
+    assert result.artifact_discrepancy_faults == []
 
 
 def test_attribution_p1_scope_dominant(sample_df, count_query, gold_count, tmp_path):
@@ -337,7 +365,11 @@ def test_attribution_p1_scope_dominant(sample_df, count_query, gold_count, tmp_p
 
     assert result.run_id == run.run_id
     assert len(result.components) == 3
+    if run.is_correct:
+        assert result.dominant_fault == "none"
+        return
     assert result.dominant_fault == "scope"
+    assert result.artifact_discrepancy_faults == ["scope"]
     # test that scope score is highest or tied
     comps = {c.component: c.shapley_value for c in result.components}
     assert comps["scope"] >= comps["facts"]
@@ -387,10 +419,52 @@ def test_attribution_result_serializable(sample_df, count_query, gold_count, tmp
     assert "run_id" in serialized
     assert "components" in serialized
     assert "shapley_value" in serialized
+    assert "artifact_discrepancy_faults" in serialized
+    assert "outcome_active_faults" in serialized
+    assert d["predicted_faults"] == d["artifact_discrepancy_faults"]
 
 
-def test_attribution_all_pipelines(sample_df, count_query, gold_count, tmp_path):
-    """Run attribution on all 6 pipelines without error."""
+def test_artifact_diagnostics_recover_compound_fault_set(sample_df, mean_query, gold_mean, tmp_path):
+    """Stage-matched comparisons recover three observable component discrepancies."""
+    p0 = P0DeterministicBaseline(artifacts_dir=tmp_path / "attr_multilabel")
+    run, _, _ = p0.run(query=mean_query, df=sample_df, gold_answer=gold_mean)
+    observed_scope = sample_df.iloc[:10].copy()
+    observed_facts = observed_scope[["record_id", "rating"]].copy()
+    observed_facts["rating"] += 10.0
+    scope_path = tmp_path / "observed_scope.parquet"
+    facts_path = tmp_path / "observed_facts.parquet"
+    observed_scope.to_parquet(scope_path, index=False)
+    observed_facts.to_parquet(facts_path, index=False)
+    run = run.model_copy(
+        update={
+            "answer": 999.0,
+            "artifact_references": {
+                **run.artifact_references,
+                "scope_enumerate": str(scope_path),
+                "fact_extract": str(facts_path),
+            },
+        }
+    )
+
+    discrepancies, component_diagnostics = diagnose_component_artifacts(run, mean_query, sample_df)
+
+    assert set(discrepancies) == {"scope", "facts", "aggregation"}
+    assert all(
+        component_diagnostics[component]["status"] == "mismatch"
+        for component in ("scope", "facts", "aggregation")
+    )
+
+
+def test_artifact_fact_comparison_treats_matching_nulls_as_equal(mean_query):
+    observed = pd.DataFrame({"record_id": ["r1"], "rating": [float("nan")]})
+    expected = pd.DataFrame({"record_id": ["r1"], "rating": [float("nan")]})
+    agrees, details = _fact_rows_agree(observed, expected, mean_query)
+    assert agrees is True
+    assert details["compared_fields"] == ["record_id", "rating"]
+
+
+def test_attribution_requires_component_artifacts(sample_df, count_query, gold_count, tmp_path):
+    """Attribution succeeds only where the parent component state is replayable."""
     attributor = CounterfactualAttributor()
 
     for pid in PIPELINE_REGISTRY:
@@ -400,13 +474,26 @@ def test_attribution_all_pipelines(sample_df, count_query, gold_count, tmp_path)
         if run.status.value != "completed":
             continue
 
+        has_component_state = any(
+            key in run.artifact_references
+            for key in ("scope_enumerate", "scope_output", "fact_extract", "extraction")
+        )
+        if not has_component_state:
+            with pytest.raises(ValueError, match="complete valid lattice"):
+                attributor.attribute(
+                    parent_run=run,
+                    query=count_query,
+                    gold_answer_obj=gold_count,
+                    oracle_df=sample_df,
+                )
+            continue
+
         result = attributor.attribute(
             parent_run=run,
             query=count_query,
             gold_answer_obj=gold_count,
             oracle_df=sample_df,
         )
-
         assert result.run_id == run.run_id
         assert len(result.components) == 3
         assert result.dominant_fault in ("scope", "facts", "aggregation", "none")
@@ -423,6 +510,62 @@ def test_p1_direct_bm25_runs(sample_df, count_query, gold_count, tmp_path, parqu
         query=count_query, df=sample_df, parquet_path=parquet_path, gold_answer=gold_count
     )
     assert run.status.value == "completed"
+
+
+def test_empty_datetime_extraction_preserves_dtype_during_fault_injection(sample_df):
+    datetime_rows = sample_df.loc[:, ["record_id", "event_time"]].copy()
+    corrupted = _corrupt_dataframe(
+        datetime_rows, ["event_time"], __import__("random").Random(42)
+    )
+    overlaid = _overlay_corrupted_fields(sample_df, corrupted)
+
+    assert pd.api.types.is_datetime64_any_dtype(corrupted["event_time"])
+    assert pd.api.types.is_datetime64_any_dtype(overlaid["event_time"])
+
+    empty = datetime_rows.iloc[0:0]
+    empty_corrupted = _corrupt_dataframe(
+        empty, ["event_time"], __import__("random").Random(42)
+    )
+    assert pd.api.types.is_datetime64_any_dtype(empty_corrupted["event_time"])
+
+
+def test_datetime_range_predicate_restores_json_string_bounds(sample_df):
+    predicate = RangePredicate(
+        field="event_time",
+        low="2021-03-01T00:00:00+00:00",
+        high="2021-06-01T00:00:00+00:00",
+    )
+
+    mask = compiler.to_pandas_mask(predicate, sample_df)
+
+    assert mask.dtype == bool
+    assert mask.any()
+
+
+def test_p1_direct_bm25_accepts_nullable_parquet_scalars(
+    sample_df, count_query, gold_count, tmp_path
+):
+    from faulttrace_pipelines.p1_direct_bm25 import P1DirectBM25Pipeline
+
+    nullable_df = sample_df.copy()
+    nullable_df.loc[nullable_df.index[0], "price"] = None
+    world_dir = tmp_path / "generated" / "worlds" / count_query.world_id
+    world_dir.mkdir(parents=True)
+    parquet_path = world_dir / "records.parquet"
+    nullable_df.to_parquet(parquet_path)
+
+    pipeline = P1DirectBM25Pipeline(artifacts_dir=tmp_path / "p1_nullable")
+    run, _, _ = pipeline.run(
+        query=count_query,
+        df=nullable_df,
+        parquet_path=parquet_path,
+        gold_answer=gold_count,
+    )
+
+    assert run.status.value == "completed"
+    assert run.error_message is None
+    assert run.is_correct is not None
+    assert run.loss is not None
 
 
 def test_p2_direct_dense_runs(sample_df, count_query, gold_count, tmp_path, parquet_path):

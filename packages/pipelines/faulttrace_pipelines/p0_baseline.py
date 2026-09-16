@@ -39,6 +39,7 @@ from faulttrace_core.models import (
 )
 from faulttrace_core.predicates import compiler
 from faulttrace_gold.pandas_engine import PandasEvaluator
+from faulttrace_gold.validator import results_agree
 
 from faulttrace_pipelines.base import AbstractPipeline
 
@@ -98,6 +99,7 @@ class P0DeterministicBaseline(AbstractPipeline):
             query_id=query.query_id,
             pipeline_id=PIPELINE_ID,
             provider_id=PROVIDER_ID,
+            execution_seed=self.execution_seed,
             started_at=started_at,
             status=RunStatus.RUNNING,
         )
@@ -202,6 +204,50 @@ class P0DeterministicBaseline(AbstractPipeline):
                     "latency_ms": float((completed_at - started_at).total_seconds() * 1000),
                     "completed_at": completed_at,
                     "artifact_references": artifact_refs,
+                }
+            )
+
+            # P0 overrides AbstractPipeline.run(), so it must explicitly apply
+            # the same conservative certification policy as every other
+            # pipeline. Certification describes evidence coverage; it is not a
+            # synonym for answer correctness.
+            from faulttrace_core.models import AnswerPolicyConfig, CoverageDecision
+
+            from faulttrace_pipelines.certification import CertificationEngine
+            from faulttrace_pipelines.coverage_adapters import extract_coverage_observations
+
+            observations = extract_coverage_observations(run, events, df, query)
+            certificate = CertificationEngine(
+                policy=AnswerPolicyConfig(
+                    policy_id="strict_structured_semantic_v2",
+                    version="2.0",
+                    require_provenance_verification=True,
+                    min_source_fact_fidelity=1.0,
+                    min_numeric_fidelity=None,
+                    require_aggregation_replay=True,
+                )
+            ).certify(run, query, observations)
+            certificate_path = run_dir / "certificate.json"
+            certificate_path.write_text(certificate.model_dump_json(indent=2), encoding="utf-8")
+            artifact_refs["certificate"] = str(certificate_path)
+            run = run.model_copy(
+                update={
+                    "certificate_id": certificate.certificate_id,
+                    "certificate_hash": certificate.certificate_hash,
+                    "certificate_policy_id": certificate.policy_id,
+                    "certificate_assurance_scope": certificate.assurance_scope,
+                    "artifact_references": artifact_refs,
+                    "policy_decision": certificate.decision.value,
+                    "final_presented_answer": (
+                        agg_result
+                        if certificate.decision == CoverageDecision.CERTIFIED
+                        else None
+                    ),
+                    "abstention_reason": (
+                        None
+                        if certificate.decision == CoverageDecision.CERTIFIED
+                        else " | ".join(code.value for code in certificate.reason_codes)
+                    ),
                 }
             )
 
@@ -351,21 +397,20 @@ class P0DeterministicBaseline(AbstractPipeline):
 
         if gold is not None:
             payload["gold_answer"] = str(gold.answer_value)
-            # Numeric comparison
+            is_correct = results_agree(answer, gold.answer_value, gold.tolerance)
+            # Preserve a useful normalized numeric loss while using the same
+            # recursive tolerance-aware comparator for every answer shape.
             try:
                 a = float(answer) if answer is not None else None
                 g = float(gold.answer_value) if gold.answer_value is not None else None
                 if a is not None and g is not None:
                     diff = abs(a - g)
-                    is_correct = diff <= gold.tolerance
                     loss = diff / (abs(g) + 1e-9)
                     msg = f"Answer={a}, Gold={g}, Diff={diff:.6f}, Correct={is_correct}"
                 else:
-                    is_correct = str(answer) == str(gold.answer_value)
                     loss = 0.0 if is_correct else 1.0
                     msg = f"Answer={answer!r}, Gold={gold.answer_value!r}, Correct={is_correct}"
             except (TypeError, ValueError):
-                is_correct = str(answer) == str(gold.answer_value)
                 loss = 0.0 if is_correct else 1.0
                 msg = f"Non-numeric comparison: Correct={is_correct}"
 
@@ -410,7 +455,13 @@ class P0DeterministicBaseline(AbstractPipeline):
 
         # Save aggregation result
         agg_path = run_dir / "aggregation_result.json"
-        agg_path.write_text(json.dumps({"result": str(agg_result)}, default=str), encoding="utf-8")
+        agg_path.write_bytes(
+            orjson.dumps(
+                {"result": agg_result},
+                option=orjson.OPT_SERIALIZE_NUMPY,
+                default=str,
+            )
+        )
         refs["aggregation_result"] = str(agg_path)
 
         # Save gold comparison

@@ -1,4 +1,11 @@
 # SciFact Retrieval Benchmark Results
+
+> Superseded for provenance by
+> `artifacts/verified/20260828_external_retrieval_v4_final`. The retrieval metrics below
+> reproduce exactly in the canonical run, which adds file manifests, per-query outputs,
+> bootstrap intervals, implementation hashes, and a checksum manifest. The historical
+> latency values below are host-load dependent and are not used in the manuscript.
+
 **Timestamp:** 2026-08-18T17:22:40.984138+00:00
 **Git Commit:** df59c3759dbd28bd8d79205246edbc947650ea7b
 

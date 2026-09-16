@@ -177,7 +177,7 @@ class WorldManifest(BaseModel):
 class TrackMGenerator:
     """
     Deterministic Track M corpus generator.
-    
+
     For a fixed seed and generator version, the output is byte-identical.
     For a fixed seed, records in N=10 are a deterministic subset of N=50,
     which are a subset of N=200, which are a subset of N=1000 (nestedness).
@@ -200,10 +200,10 @@ class TrackMGenerator:
     def generate_records(self, n: int) -> list[CorpusRecord]:
         """
         Generate exactly n records deterministically.
-        
+
         Records are generated in a fixed sequence; generating n=50 returns
         the n=10 records as the first 10, guaranteeing nestedness.
-        
+
         NESTEDNESS GUARANTEE: Product IDs are drawn from a fixed pool of
         _PRODUCT_ID_POOL entries generated with a separate RNG before the
         record-generation RNG starts. This ensures the main RNG sequence
@@ -349,7 +349,7 @@ class TrackMGenerator:
     ) -> tuple[CorpusWorld, WorldManifest]:
         """
         Generate a corpus world of n records and save to disk.
-        
+
         Returns (CorpusWorld, WorldManifest).
         """
         if world_id is None:
@@ -435,7 +435,7 @@ class TrackMGenerator:
     ) -> list[tuple[CorpusWorld, WorldManifest]]:
         """
         Generate a sequence of nested worlds at increasing scales.
-        
+
         Scales must be sorted ascending. Each larger world is a superset of
         the smaller world (nestedness guarantee via fixed RNG sequence).
         """
@@ -460,7 +460,7 @@ class TrackMGenerator:
     def generate_adversarial_fixtures(self, output_dir: Path) -> dict[str, Any]:
         """
         Generate controlled adversarial edge cases.
-        
+
         These are separate from the main corpus worlds and used for
         testing boundary conditions in the gold engine.
         """
@@ -525,7 +525,7 @@ class TrackMGenerator:
         records = []
         tied_brands = ["BrandAlpha", "BrandBeta", "BrandGamma"]
         for brand in tied_brands:
-            for i in range(5):  # exactly 5 records per brand
+            for _i in range(5):  # exactly 5 records per brand
                 r = self._gen_base_record(rng, len(records), "tie_world")
                 records.append(r.model_copy(update={"brand": brand}))
         return records

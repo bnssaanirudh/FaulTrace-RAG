@@ -1,23 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import Image from 'next/image';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   BarChart3,
-  AlertTriangle,
   ShieldCheck,
-  RefreshCw,
-  Zap,
-  TrendingUp,
   TrendingDown,
   Download,
-  Settings,
   Activity,
-  Play,
-  RotateCcw,
   FileSpreadsheet,
 } from 'lucide-react';
 import { formatPercent, formatMs } from '@/lib/utils';
@@ -40,7 +34,6 @@ export default function ExperimentsPage() {
   // TAB 1: Calibration Config
   const [policyId, setPolicyId] = useState('strict_exact_v1');
   const [metrics, setMetrics] = useState<any | null>(null);
-  const [loadingMetrics, setLoadingMetrics] = useState(true);
   const [error, setError] = useState('');
   const [curveData, setCurveData] = useState<any[]>([]);
 
@@ -76,7 +69,7 @@ export default function ExperimentsPage() {
         if (json.pipelines) setPipelinesList(json.pipelines.join(','));
         if (json.scales) setScalesList(json.scales.join(','));
         if (json.query_families) setFamiliesList(json.query_families.join(','));
-      } catch (err) {
+      } catch {
         setError('Invalid JSON config file');
       }
     };
@@ -84,43 +77,40 @@ export default function ExperimentsPage() {
   };
 
   // Load active metrics & experiments
-  async function loadCalibration() {
-    setLoadingMetrics(true);
+  const loadCalibration = useCallback(async () => {
     setError('');
     try {
       const res = await api.batchEvaluatePolicy(policyId);
       setMetrics(res);
 
-      const mockCurve = [
-        { coverage: 100, accuracy: 68, risk: 32, label: 'Raw Baseline' },
-        { coverage: 85, accuracy: 78, risk: 22, label: 'Warn Partial' },
-        { coverage: 70, accuracy: 86, risk: 14, label: 'Strict Exact' },
-        { coverage: 55, accuracy: 92, risk: 8, label: 'High Confidence' },
-        { coverage: 35, accuracy: 97, risk: 3, label: 'Ultra Strict' },
-      ];
-      setCurveData(mockCurve);
+      setCurveData([
+        {
+          coverage: Number(res.answer_coverage_rate || 0) * 100,
+          accuracy: Number(res.selective_accuracy || 0) * 100,
+          risk: Number(res.risk || 0) * 100,
+          label: `${policyId} (measured)`,
+        },
+      ]);
     } catch (e: any) {
       setError(e.message);
-    } finally {
-      setLoadingMetrics(false);
     }
-  }
+  }, [policyId]);
 
-  async function loadExperiments() {
+  const loadExperiments = useCallback(async () => {
     try {
       const res = await api.listExperiments();
       setExperimentsList(res.experiments || []);
     } catch (e) {
       console.error(e);
     }
-  }
+  }, []);
 
   useEffect(() => {
     if (activeTab === 'calibration') {
-      loadCalibration();
+      void loadCalibration();
     }
-    loadExperiments();
-  }, [policyId, activeTab]);
+    void loadExperiments();
+  }, [activeTab, loadCalibration, loadExperiments]);
 
   // Handle plan matrix
   async function handlePlan() {
@@ -751,7 +741,7 @@ export default function ExperimentsPage() {
               </h3>
               <div className="aspect-[3/2] w-full rounded bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-slate-600 text-xs relative overflow-hidden group">
                 {selectedExp && selectedExp.status === 'complete' ? (
-                  <img src={`/api/v1/experiments/${selectedExp.experiment_id}/download/accuracy_vs_scale.svg`} className="w-full h-full object-contain p-2" alt="Accuracy vs Scale" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  <Image fill unoptimized src={`/api/v1/experiments/${selectedExp.experiment_id}/download/accuracy_vs_scale.svg`} className="object-contain p-2" alt="Accuracy vs Scale" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 ) : (
                   <span>[Vector SVG accuracy_vs_scale.svg]</span>
                 )}
@@ -765,7 +755,7 @@ export default function ExperimentsPage() {
               </h3>
               <div className="aspect-[3/2] w-full rounded bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-slate-600 text-xs relative overflow-hidden group">
                 {selectedExp && selectedExp.status === 'complete' ? (
-                  <img src={`/api/v1/experiments/${selectedExp.experiment_id}/download/loss_vs_scale.svg`} className="w-full h-full object-contain p-2" alt="Loss vs Scale" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  <Image fill unoptimized src={`/api/v1/experiments/${selectedExp.experiment_id}/download/loss_vs_scale.svg`} className="object-contain p-2" alt="Loss vs Scale" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 ) : (
                   <span>[Vector SVG loss_vs_scale.svg]</span>
                 )}
@@ -779,7 +769,7 @@ export default function ExperimentsPage() {
               </h3>
               <div className="aspect-[3/2] w-full rounded bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-slate-600 text-xs relative overflow-hidden group">
                 {selectedExp && selectedExp.status === 'complete' ? (
-                  <img src={`/api/v1/experiments/${selectedExp.experiment_id}/download/coverage_vs_error.svg`} className="w-full h-full object-contain p-2" alt="Coverage vs Error" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  <Image fill unoptimized src={`/api/v1/experiments/${selectedExp.experiment_id}/download/coverage_vs_error.svg`} className="object-contain p-2" alt="Coverage vs Error" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 ) : (
                   <span>[Vector SVG coverage_vs_error.svg]</span>
                 )}
@@ -793,7 +783,7 @@ export default function ExperimentsPage() {
               </h3>
               <div className="aspect-[3/2] w-full rounded bg-white/[0.02] border border-white/[0.06] flex items-center justify-center text-slate-600 text-xs relative overflow-hidden group">
                 {selectedExp && selectedExp.status === 'complete' ? (
-                  <img src={`/api/v1/experiments/${selectedExp.experiment_id}/download/p4_p5_repair_benefit.svg`} className="w-full h-full object-contain p-2" alt="P4 vs P5 Repair Benefit" onError={(e) => (e.currentTarget.style.display = 'none')} />
+                  <Image fill unoptimized src={`/api/v1/experiments/${selectedExp.experiment_id}/download/p4_p5_repair_benefit.svg`} className="object-contain p-2" alt="P4 vs P5 Repair Benefit" onError={(e) => (e.currentTarget.style.display = 'none')} />
                 ) : (
                   <span>[Vector SVG p4_p5_repair_benefit.svg]</span>
                 )}

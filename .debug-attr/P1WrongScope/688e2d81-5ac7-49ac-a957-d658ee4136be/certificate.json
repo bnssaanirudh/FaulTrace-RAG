@@ -1,0 +1,65 @@
+{
+  "certificate_id": "09974692-5b5b-4a88-890d-1be175924c78",
+  "schema_version": "1.0.0",
+  "run_id": "688e2d81-5ac7-49ac-a957-d658ee4136be",
+  "query_id": "05d35701-0f66-4fad-9d77-96c8ebdb4ba3",
+  "world_id": "test_world",
+  "pipeline_id": "P1-wrong-scope",
+  "config_hash": "a1de00510980efa9ec20579e13913c0a",
+  "evidence_requirement": {
+    "requirement_type": "exact",
+    "requires_full_scope": true,
+    "required_scope_count": null,
+    "required_denominator": null,
+    "required_tie_resolution": false,
+    "required_time_buckets": null
+  },
+  "observations": {
+    "known_world_size": 50,
+    "eligible_set_size_known": true,
+    "eligible_set_size": 12,
+    "scope_membership_known": true,
+    "eligible_record_ids_covered": 0,
+    "unexpected_record_ids": 0,
+    "retrieved_units": 0,
+    "unique_represented_record_ids": 0,
+    "extracted_valid_rows": 0,
+    "ambiguous_rows": 0,
+    "failed_rows": 0,
+    "missing_required_fields": 0,
+    "denominator_evaluable": false,
+    "numerator_evaluable": false,
+    "time_bucket_completeness": null,
+    "ranking_candidate_completeness": null,
+    "tie_boundary_completeness": false,
+    "truncation_count": 0,
+    "dropped_context_count": 0,
+    "provenance_verifiable": true,
+    "provenance_coverage": 1.0,
+    "source_fact_fidelity": 1.0,
+    "numeric_fidelity": 1.0,
+    "aggregation_replay_evaluable": true,
+    "aggregation_replay_consistent": true
+  },
+  "coverage_ratios": {
+    "scope_coverage": 0.0,
+    "scope_precision": 0.0,
+    "ambiguity_ratio": 0.0,
+    "provenance_coverage": 1.0,
+    "source_fact_fidelity": 1.0,
+    "aggregation_replay_consistency": 1.0
+  },
+  "unknown_dimensions": [
+    "extraction_completeness"
+  ],
+  "decision": "abstain",
+  "reason_codes": [
+    "SCOPE_COVERAGE_BELOW_REQUIRED"
+  ],
+  "human_readable_explanation": "Certification withheld: SCOPE_COVERAGE_BELOW_REQUIRED",
+  "policy_id": "strict_structured_semantic_v2",
+  "policy_version": "2.0",
+  "assurance_scope": "structured_semantic",
+  "artifact_lineage": {},
+  "certificate_hash": "56c6b66604d18f64c2e088b3ec670fb3"
+}

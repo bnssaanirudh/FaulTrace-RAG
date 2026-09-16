@@ -1,0 +1,33 @@
+{
+  "query_id": "05d35701-0f66-4fad-9d77-96c8ebdb4ba3",
+  "family": "count",
+  "natural_language_question": "How many Electronics reviews are there?",
+  "scope_predicate": {
+    "kind": "eq",
+    "field": "category",
+    "value": "Electronics"
+  },
+  "fact_spec": {
+    "fields": [
+      "record_id",
+      "category"
+    ],
+    "derived_fields": [],
+    "null_policy": "exclude"
+  },
+  "aggregation_spec": {
+    "kind": "count",
+    "distinct": false,
+    "field": null
+  },
+  "tolerance": 1e-6,
+  "expected_evidence_requirement": "all_matching_records",
+  "world_id": "test_world",
+  "template_id": "test_count",
+  "version": "1.0",
+  "created_at": "2026-08-28T03:25:40.308240Z",
+  "dataset_snapshot_id": null,
+  "difficulty": null,
+  "split": null,
+  "selectivity": null
+}

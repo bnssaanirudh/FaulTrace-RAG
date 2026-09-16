@@ -5,8 +5,74 @@ Statistics engine: bootstrap confidence intervals, paired differences, and multi
 from __future__ import annotations
 
 import random
+from collections import defaultdict
 
 import numpy as np
+
+
+def compute_clustered_bootstrap_ci(
+    values: list[float],
+    cluster_ids: list[str],
+    confidence_level: float = 0.95,
+    samples: int = 10_000,
+    seed: int = 42,
+) -> tuple[float, tuple[float, float]]:
+    """Bootstrap a mean by resampling independent clusters, not repeated rows.
+
+    This is the appropriate default when multiple seeds, models, or pipelines
+    reuse the same query. All observations for a sampled query move together.
+    """
+    if not values or len(values) != len(cluster_ids):
+        raise ValueError("values and cluster_ids must be non-empty and have equal length")
+    grouped: dict[str, list[float]] = defaultdict(list)
+    for value, cluster_id in zip(values, cluster_ids, strict=True):
+        grouped[str(cluster_id)].append(float(value))
+    clusters = sorted(grouped)
+    rng = np.random.default_rng(seed)
+    boot_means = np.empty(samples, dtype=float)
+    for index in range(samples):
+        sampled = rng.choice(clusters, size=len(clusters), replace=True)
+        rows = [value for cluster in sampled for value in grouped[str(cluster)]]
+        boot_means[index] = float(np.mean(rows))
+    alpha = 1.0 - confidence_level
+    interval = np.quantile(boot_means, [alpha / 2.0, 1.0 - alpha / 2.0])
+    return float(np.mean(values)), (float(interval[0]), float(interval[1]))
+
+
+def paired_permutation_test(
+    data1: list[float],
+    data2: list[float],
+    samples: int = 10_000,
+    seed: int = 42,
+) -> float:
+    """Return a two-sided paired randomization-test p-value."""
+    if not data1 or len(data1) != len(data2):
+        raise ValueError("paired samples must be non-empty and have equal length")
+    diffs = np.asarray(data1, dtype=float) - np.asarray(data2, dtype=float)
+    observed = abs(float(np.mean(diffs)))
+    if np.allclose(diffs, 0.0):
+        return 1.0
+    rng = np.random.default_rng(seed)
+    extreme = 0
+    for _ in range(samples):
+        signs = rng.choice((-1.0, 1.0), size=len(diffs))
+        extreme += int(abs(float(np.mean(diffs * signs))) >= observed - 1e-15)
+    return (extreme + 1) / (samples + 1)
+
+
+def holm_adjusted_pvalues(p_values: list[float]) -> list[float]:
+    """Return monotone Holm-adjusted p-values in the original order."""
+    count = len(p_values)
+    if count == 0:
+        return []
+    order = sorted(range(count), key=p_values.__getitem__)
+    adjusted = [0.0] * count
+    running_max = 0.0
+    for rank, index in enumerate(order):
+        candidate = min(1.0, (count - rank) * float(p_values[index]))
+        running_max = max(running_max, candidate)
+        adjusted[index] = running_max
+    return adjusted
 
 
 def compute_paired_bootstrap_ci(

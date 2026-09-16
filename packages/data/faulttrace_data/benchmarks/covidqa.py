@@ -1,4 +1,5 @@
 import hashlib
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -12,8 +13,10 @@ class CovidQAAdapter:
         self.data_root = data_root
         self.covidqa_dir = self.data_root / "ragbench" / "covidqa"
 
-    def load_corpus(self, splits: list[str] = ["train-00000-of-00001.parquet", "validation-00000-of-00001.parquet", "test-00000-of-00001.parquet"]) -> list[TextDocument]:
+    def load_corpus(self, splits: list[str] | None = None) -> list[TextDocument]:
         """Extract unique documents from the context of all questions."""
+        if splits is None:
+            splits = ["train-00000-of-00001.parquet", "validation-00000-of-00001.parquet", "test-00000-of-00001.parquet"]
         docs = {}
         for split in splits:
             file_path = self.covidqa_dir / split
@@ -22,13 +25,13 @@ class CovidQAAdapter:
 
             df = pd.read_parquet(file_path, columns=["id", "documents"])
             for _, row in df.iterrows():
-                q_id = row["id"]
+                q_id = str(row["id"])
                 documents = row["documents"]
 
                 if documents is None:
                     continue
 
-                for idx, doc_text in enumerate(documents):
+                for _idx, doc_text in enumerate(documents):
                     # We generate a deterministic doc ID based on text hash
                     doc_hash = hashlib.sha256(doc_text.encode("utf-8")).hexdigest()[:16]
                     if doc_hash not in docs:
@@ -40,6 +43,33 @@ class CovidQAAdapter:
                         )
         return list(docs.values())
 
+    def load_candidate_sets(
+        self, split: str = "test-00000-of-00001.parquet"
+    ) -> dict[str, list[TextDocument]]:
+        """Load the four supplied context candidates for each RAGBench row."""
+        file_path = self.covidqa_dir / split
+        if not file_path.exists():
+            return {}
+
+        frame = pd.read_parquet(file_path, columns=["id", "documents"])
+        candidate_sets: dict[str, list[TextDocument]] = {}
+        for _, row in frame.iterrows():
+            query_id = str(row["id"])
+            documents = row["documents"]
+            candidates: dict[str, TextDocument] = {}
+            if documents is not None:
+                for text in documents:
+                    doc_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+                    if doc_hash not in candidates:
+                        candidates[doc_hash] = TextDocument(
+                            doc_id=doc_hash,
+                            title=f"COVID-QA Document {doc_hash}",
+                            text=text,
+                            metadata={"source": "covidqa", "query_id": query_id},
+                        )
+            candidate_sets[query_id] = list(candidates.values())
+        return candidate_sets
+
     def load_queries(self, split: str = "test-00000-of-00001.parquet") -> dict[str, str]:
         """Load queries. Returns mapping of query_id -> text."""
         file_path = self.covidqa_dir / split
@@ -49,7 +79,7 @@ class CovidQAAdapter:
         df = pd.read_parquet(file_path, columns=["id", "question"])
         queries = {}
         for _, row in df.iterrows():
-            queries[row["id"]] = row["question"]
+            queries[str(row["id"])] = row["question"]
         return queries
 
     def load_qrels(self, split: str = "test-00000-of-00001.parquet") -> dict[str, dict[str, int]]:
@@ -70,21 +100,25 @@ class CovidQAAdapter:
         df = pd.read_parquet(file_path)
         qrels = {}
         for _, row in df.iterrows():
-            q_id = row["id"]
+            q_id = str(row["id"])
             documents = row.get("documents", [])
             rel_keys = row.get("all_relevant_sentence_keys", [])
 
-            qrels[q_id] = {}
-            if not documents or not rel_keys:
+            if documents is None or rel_keys is None or len(documents) == 0 or len(rel_keys) == 0:
                 continue
 
-            # 'rel_keys' often look like '0a', '0b', '1a' where the digit is the document index
+            relevant: dict[str, int] = {}
+            # Keys are encoded as ``<document index><sentence letter>``.  Parse
+            # the complete numeric prefix rather than assuming a single digit.
             for key in rel_keys:
-                if key and key[0].isdigit():
-                    doc_idx = int(key[0])
+                match = re.match(r"^(\d+)", str(key))
+                if match:
+                    doc_idx = int(match.group(1))
                     if doc_idx < len(documents):
                         doc_text = documents[doc_idx]
                         doc_hash = hashlib.sha256(doc_text.encode("utf-8")).hexdigest()[:16]
-                        qrels[q_id][doc_hash] = 1
+                        relevant[doc_hash] = 1
+            if relevant:
+                qrels[str(q_id)] = relevant
 
         return qrels

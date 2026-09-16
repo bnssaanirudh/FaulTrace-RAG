@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings, ShieldCheck, Activity, AlertTriangle, RefreshCw, EyeOff, Eye } from 'lucide-react';
+import { Settings, ShieldCheck, AlertTriangle, EyeOff, Eye } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';

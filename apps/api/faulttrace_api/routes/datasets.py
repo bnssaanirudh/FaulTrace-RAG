@@ -4,6 +4,7 @@ Dataset snapshot REST API endpoints — Prompt 2 (WP8).
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,26 @@ from fastapi import APIRouter, HTTPException, Query
 from faulttrace_api.config import get_settings
 
 router = APIRouter()
+
+
+def _resolve_trusted_input(input_path: str, *, allow_directory: bool = False) -> Path:
+    """Resolve an ingestion path and enforce explicit trusted-root containment."""
+    settings = get_settings()
+    try:
+        resolved = Path(input_path).resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail="Invalid or non-existent path") from exc
+
+    configured = [Path(value).resolve() for value in settings.trusted_ingest_roots.split(os.pathsep) if value]
+    fixture_root = Path("apps/api/tests/fixtures").resolve()
+    roots = [settings.data_root.resolve(), *configured]
+    if fixture_root.exists():
+        roots.append(fixture_root)
+    if not any(resolved == root or resolved.is_relative_to(root) for root in roots):
+        raise HTTPException(status_code=400, detail="Path traversal detected: outside trusted roots")
+    if resolved.is_dir() and not allow_directory:
+        raise HTTPException(status_code=400, detail="Expected a file, not a directory")
+    return resolved
 
 
 def _get_registry():
@@ -142,31 +163,11 @@ async def ingest_dataset(request: IngestRequest) -> dict[str, Any]:
     from faulttrace_data.snapshot import SnapshotRegistry
 
     settings = get_settings()
-    input_path = Path(request.input_path)
-
-    # SECURITY: Path traversal protection
-    try:
-        resolved_path = input_path.resolve(strict=True)
-        if not str(resolved_path).startswith(
-            str(settings.data_root.resolve())
-        ) and "fixtures" not in str(resolved_path):
-            raise HTTPException(
-                status_code=400, detail="Path traversal detected: outside trusted roots"
-            )
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid or non-existent path")
-
-    if ".." in request.input_path:
-        raise HTTPException(status_code=400, detail="Path traversal detected")
+    resolved_path = _resolve_trusted_input(request.input_path)
 
     # SECURITY: Extension / MIME check (simple)
-    if not (input_path.name.endswith(".json") or input_path.name.endswith(".jsonl")):
+    if resolved_path.suffix.lower() not in {".json", ".jsonl"}:
         raise HTTPException(status_code=400, detail="Only .json or .jsonl files are allowed")
-
-    if not input_path.exists():
-        raise HTTPException(status_code=404, detail=f"Input file not found: {input_path}")
 
     output = settings.data_root / "snapshots"
     data_root = settings.data_root
@@ -176,11 +177,11 @@ async def ingest_dataset(request: IngestRequest) -> dict[str, Any]:
         max_bytes=request.max_bytes_mb * 1024 * 1024,
     )
 
-    producing_cmd = f"api: POST /api/v1/datasets/ingest --input {input_path.name}"
+    producing_cmd = f"api: POST /api/v1/datasets/ingest --input {resolved_path.name}"
 
     try:
         report, snapshot = adapter.ingest(
-            source_path=input_path,
+            source_path=resolved_path,
             output_root=output,
             data_root=data_root,
             license_note=request.license_note,
@@ -231,27 +232,7 @@ async def ingest_text_dataset(request: TextIngestRequest) -> dict[str, Any]:
     from faulttrace_data.text.pipeline import TextIngestionPipeline
 
     settings = get_settings()
-    input_path = Path(request.input_path)
-
-    # SECURITY: Path traversal protection
-    try:
-        resolved_path = input_path.resolve(strict=True)
-        if not str(resolved_path).startswith(
-            str(settings.data_root.resolve())
-        ) and "fixtures" not in str(resolved_path):
-            raise HTTPException(
-                status_code=400, detail="Path traversal detected: outside trusted roots"
-            )
-    except HTTPException:
-        raise
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid or non-existent path")
-
-    if ".." in request.input_path:
-        raise HTTPException(status_code=400, detail="Path traversal detected")
-
-    if not input_path.exists():
-        raise HTTPException(status_code=404, detail=f"Input file/directory not found: {input_path}")
+    resolved_path = _resolve_trusted_input(request.input_path, allow_directory=True)
 
     registry_path = settings.data_root / "manifests" / "text_snapshots.jsonl"
     pipeline = TextIngestionPipeline(data_root=settings.data_root, registry_path=registry_path)

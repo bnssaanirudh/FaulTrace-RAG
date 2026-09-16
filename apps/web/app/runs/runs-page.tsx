@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Activity, CheckCircle2, ChevronLeft, ChevronRight, Play, XCircle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { api, Run } from '@/lib/api';
@@ -19,7 +19,7 @@ export function RunsPage() {
   const [traceEvents, setTraceEvents] = useState<Record<string, unknown>[]>([]);
   const [traceLoading, setTraceLoading] = useState(false);
 
-  async function load(p = page) {
+  const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
       const res = await api.listRuns(undefined, undefined, p, 20);
@@ -30,7 +30,7 @@ export function RunsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   async function loadTrace(runId: string) {
     setSelectedRun(runId);
@@ -45,7 +45,7 @@ export function RunsPage() {
     }
   }
 
-  useEffect(() => { load(page); }, [page]);
+  useEffect(() => { void load(page); }, [load, page]);
 
   const totalPages = Math.ceil(total / 20);
   const correctCount = runs.filter((r) => r.is_correct === true).length;

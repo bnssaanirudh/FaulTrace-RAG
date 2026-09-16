@@ -1,6 +1,6 @@
 {
   "name": "demo_matrix",
-  "dataset_id": "amazon_demo",
+  "dataset_id": "track_m",
   "scales": [
     10,
     50
@@ -30,7 +30,7 @@
     "deterministic"
   ],
   "models": [
-    "gpt-4o-mini"
+    "deterministic-v1"
   ],
   "retriever": "bm25",
   "top_k": 10,
@@ -38,7 +38,7 @@
   "context_budget": 4000,
   "batch_size": 10,
   "repair_policy": "strict_exact_v1",
-  "certificate_policy": "strict_exact_v1",
+  "certificate_policy": "strict_structured_semantic_v2",
   "seeds": [
     42
   ],

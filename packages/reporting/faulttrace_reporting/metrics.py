@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AggregateMetrics(BaseModel):
@@ -19,13 +19,13 @@ class AggregateMetrics(BaseModel):
     mean_loss: float
 
     # Retrieval & Scope
-    mean_scope_coverage: float
-    retrieval_recall: float
-    retrieval_precision: float
+    mean_scope_coverage: float | None
+    retrieval_recall: float | None
+    retrieval_precision: float | None
 
     # Extraction
-    extraction_field_accuracy: float
-    extraction_macro_f1: float
+    extraction_field_accuracy: float | None
+    extraction_macro_f1: float | None
 
     # Certificates & Selective Prediction
     certified_rate: float
@@ -34,13 +34,14 @@ class AggregateMetrics(BaseModel):
 
     # Performance & Footprint
     mean_latency_ms: float
-    total_cost_usd: float
-    cache_hit_rate: float
+    total_cost_usd: float | None
+    cache_hit_rate: float | None
 
     # Attribution averages
     avg_phi_r: float
     avg_phi_e: float
     avg_phi_a: float
+    measurement_status: dict[str, str] = Field(default_factory=dict)
 
 
 class MetricsComputer:
@@ -58,17 +59,17 @@ class MetricsComputer:
                 failure_count=0,
                 accuracy=0.0,
                 mean_loss=0.0,
-                mean_scope_coverage=0.0,
-                retrieval_recall=0.0,
-                retrieval_precision=0.0,
-                extraction_field_accuracy=0.0,
-                extraction_macro_f1=0.0,
+                mean_scope_coverage=None,
+                retrieval_recall=None,
+                retrieval_precision=None,
+                extraction_field_accuracy=None,
+                extraction_macro_f1=None,
                 certified_rate=0.0,
                 selective_risk=0.0,
                 false_certification_rate=0.0,
                 mean_latency_ms=0.0,
-                total_cost_usd=0.0,
-                cache_hit_rate=0.0,
+                total_cost_usd=None,
+                cache_hit_rate=None,
                 avg_phi_r=0.0,
                 avg_phi_e=0.0,
                 avg_phi_a=0.0,
@@ -85,38 +86,40 @@ class MetricsComputer:
                 failure_count=failure_count,
                 accuracy=0.0,
                 mean_loss=0.0,
-                mean_scope_coverage=0.0,
-                retrieval_recall=0.0,
-                retrieval_precision=0.0,
-                extraction_field_accuracy=0.0,
-                extraction_macro_f1=0.0,
+                mean_scope_coverage=None,
+                retrieval_recall=None,
+                retrieval_precision=None,
+                extraction_field_accuracy=None,
+                extraction_macro_f1=None,
                 certified_rate=0.0,
                 selective_risk=0.0,
                 false_certification_rate=0.0,
                 mean_latency_ms=0.0,
-                total_cost_usd=0.0,
-                cache_hit_rate=0.0,
+                total_cost_usd=None,
+                cache_hit_rate=None,
                 avg_phi_r=0.0,
                 avg_phi_e=0.0,
                 avg_phi_a=0.0,
             )
 
         # Basic Correctness & Loss
-        correct_count = sum(1 for r in completed_runs if r.get("is_correct") is True)
-        accuracy = correct_count / completed_count
-        mean_loss = sum(float(r.get("loss") or 0) for r in completed_runs) / completed_count
+        scored_runs = [r for r in completed_runs if r.get("is_correct") is not None]
+        loss_runs = [r for r in completed_runs if r.get("loss") is not None]
+        correct_count = sum(1 for r in scored_runs if r.get("is_correct") is True)
+        accuracy = correct_count / len(scored_runs) if scored_runs else 0.0
+        mean_loss = (
+            sum(float(r["loss"]) for r in loss_runs) / len(loss_runs) if loss_runs else 0.0
+        )
 
-        # Scope coverage & retrieval stats (simulate bounds or match query metadata)
-        scope_coverages = []
-        for r in completed_runs:
-            if (
-                r.get("pipeline_id") == "P1-wrong-scope"
-                or r.get("pipeline_id") == "P4-compound-scope-facts"
-            ):
-                scope_coverages.append(0.8)
-            else:
-                scope_coverages.append(1.0)
-        mean_scope_cov = sum(scope_coverages) / len(scope_coverages)
+        def measured_mean(field: str) -> float | None:
+            values = [float(r[field]) for r in completed_runs if r.get(field) is not None]
+            return sum(values) / len(values) if values else None
+
+        mean_scope_cov = measured_mean("scope_coverage")
+        retrieval_recall = measured_mean("retrieval_recall")
+        retrieval_precision = measured_mean("retrieval_precision")
+        extraction_field_accuracy = measured_mean("extraction_field_accuracy")
+        extraction_macro_f1 = measured_mean("extraction_macro_f1")
 
         # Selective Prediction / Certification Rates
         certified_runs = [r for r in completed_runs if r.get("policy_decision") == "certified"]
@@ -137,9 +140,11 @@ class MetricsComputer:
         mean_latency = (
             sum(float(r.get("latency_ms") or 0) for r in completed_runs) / completed_count
         )
-        # Cost mapping
-        total_cost = sum(
-            0.0045 if (r.get("provider_id") != "deterministic") else 0.0 for r in completed_runs
+        measured_costs = [float(r["cost_usd"]) for r in completed_runs if r.get("cost_usd") is not None]
+        total_cost = sum(measured_costs) if measured_costs else None
+        cache_values = [bool(r["cache_hit"]) for r in completed_runs if r.get("cache_hit") is not None]
+        cache_hit_rate = (
+            sum(1 for value in cache_values if value) / len(cache_values) if cache_values else None
         )
 
         # Average Attributions if provided
@@ -152,7 +157,7 @@ class MetricsComputer:
                 for c in comps:
                     if c.get("component") == "scope":
                         phi_r_vals.append(c.get("shapley_value", 0.0))
-                    elif c.get("component") == "extraction":
+                    elif c.get("component") in ("facts", "extraction"):
                         phi_e_vals.append(c.get("shapley_value", 0.0))
                     elif c.get("component") == "aggregation":
                         phi_a_vals.append(c.get("shapley_value", 0.0))
@@ -171,17 +176,29 @@ class MetricsComputer:
             accuracy=accuracy,
             mean_loss=mean_loss,
             mean_scope_coverage=mean_scope_cov,
-            retrieval_recall=mean_scope_cov,  # recall maps to scope coverage
-            retrieval_precision=0.9,
-            extraction_field_accuracy=0.95,
-            extraction_macro_f1=0.94,
+            retrieval_recall=retrieval_recall,
+            retrieval_precision=retrieval_precision,
+            extraction_field_accuracy=extraction_field_accuracy,
+            extraction_macro_f1=extraction_macro_f1,
             certified_rate=certified_rate,
             selective_risk=selective_risk,
             false_certification_rate=false_cert_rate,
             mean_latency_ms=mean_latency,
             total_cost_usd=total_cost,
-            cache_hit_rate=0.0,
+            cache_hit_rate=cache_hit_rate,
             avg_phi_r=avg_phi_r,
             avg_phi_e=avg_phi_e,
             avg_phi_a=avg_phi_a,
+            measurement_status={
+                name: ("measured" if value is not None else "unavailable_not_simulated")
+                for name, value in {
+                    "mean_scope_coverage": mean_scope_cov,
+                    "retrieval_recall": retrieval_recall,
+                    "retrieval_precision": retrieval_precision,
+                    "extraction_field_accuracy": extraction_field_accuracy,
+                    "extraction_macro_f1": extraction_macro_f1,
+                    "total_cost_usd": total_cost,
+                    "cache_hit_rate": cache_hit_rate,
+                }.items()
+            },
         )

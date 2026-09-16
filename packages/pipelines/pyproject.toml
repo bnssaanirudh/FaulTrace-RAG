@@ -12,7 +12,16 @@ dependencies = [
     "faulttrace-gold",
     "pandas>=2.2.0",
     "orjson>=3.10.0",
+    "numpy>=1.26.0",
+    "rank-bm25>=0.2.2",
+    "faiss-cpu>=1.8.0",
+    "openai>=1.35.0",
+    "tiktoken>=0.7.0",
 ]
+
+[project.optional-dependencies]
+dense = ["sentence-transformers>=3.0.1"]
+gnn = ["torch>=2.2.0", "torch-geometric>=2.5.0"]
 
 [tool.setuptools.packages.find]
 where = ["."]

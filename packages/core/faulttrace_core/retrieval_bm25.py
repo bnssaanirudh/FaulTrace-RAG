@@ -39,9 +39,10 @@ class BM25Retriever(RetrievalEngine):
 
         results = []
         for rank, idx in enumerate(top_indices):
-            # Only return items with a non-zero score (or let them all pass if needed, but 0 means no match)
-            if scores[idx] > 0:
-                results.append(
-                    {"unit": self.units[idx], "score": float(scores[idx]), "rank": rank + 1}
-                )
+            # A retriever must return a complete top-k ranking when the corpus has
+            # at least k items. Zero and negative BM25 scores are still ordered
+            # candidates; dropping them silently changes recall and nDCG.
+            results.append(
+                {"unit": self.units[idx], "score": float(scores[idx]), "rank": rank + 1}
+            )
         return results

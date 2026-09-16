@@ -10,9 +10,9 @@ class HybridRetriever(RetrievalEngine):
         self.engine_a = engine_a
         self.engine_b = engine_b
         self.rrf_k = rrf_k
-        self.units = []
+        self.units: list[RetrievalUnit] = []
 
-    def build_index(self, units: list[RetrievalUnit], **kwargs):
+    def build_index(self, units: list[RetrievalUnit], **kwargs) -> None:
         """Build indexes for both underlying engines."""
         self.units = units
         self.engine_a.build_index(units, **kwargs)
@@ -28,8 +28,8 @@ class HybridRetriever(RetrievalEngine):
         results_a = self.engine_a.search(query, top_k=fetch_k, **kwargs)
         results_b = self.engine_b.search(query, top_k=fetch_k, **kwargs)
 
-        rrf_scores = {}
-        unit_map = {}
+        rrf_scores: dict[str, float] = {}
+        unit_map: dict[str, RetrievalUnit] = {}
 
         # Calculate RRF for Engine A
         for item in results_a:
@@ -48,7 +48,7 @@ class HybridRetriever(RetrievalEngine):
         # Sort combined scores
         sorted_rrf = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)
 
-        results = []
+        results: list[dict[str, Any]] = []
         for rank, (u_id, score) in enumerate(sorted_rrf[:top_k]):
             results.append({"unit": unit_map[u_id], "score": float(score), "rank": rank + 1})
 

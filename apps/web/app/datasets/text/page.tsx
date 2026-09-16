@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { FileText, Database, ShieldCheck, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { FileText, Database, ShieldCheck } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import Link from 'next/link';
 
@@ -19,14 +19,23 @@ export default function TextDatasetsPage() {
   const [inputPath, setInputPath] = useState('');
   const [datasetId, setDatasetId] = useState('docs_corpus');
   const [sourceType, setSourceType] = useState('txt');
-  const [licenseNote, setLicenseNote] = useState('');
+  const [licenseNote] = useState('');
   const [chunkSize, setChunkSize] = useState(1000);
   const [overlap, setOverlap] = useState(100);
   const [strictChunkDedup, setStrictChunkDedup] = useState(false);
   const [ingesting, setIngesting] = useState(false);
   const [ingestStatus, setIngestStatus] = useState('');
 
-  async function load() {
+  const selectSnapshot = useCallback(async (id: string) => {
+    try {
+      const snap = await api.getTextDatasetSnapshot(id);
+      setSelectedSnapshot(snap);
+    } catch (e: unknown) {
+      console.error(e);
+    }
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
@@ -40,16 +49,7 @@ export default function TextDatasetsPage() {
     } finally {
       setLoading(false);
     }
-  }
-
-  async function selectSnapshot(id: string) {
-    try {
-      const snap = await api.getTextDatasetSnapshot(id);
-      setSelectedSnapshot(snap);
-    } catch (e: any) {
-      console.error(e);
-    }
-  }
+  }, [selectSnapshot]);
 
   async function handleIngest(e: React.FormEvent) {
     e.preventDefault();
@@ -81,8 +81,8 @@ export default function TextDatasetsPage() {
   }
 
   useEffect(() => {
-    load();
-  }, []);
+    void load();
+  }, [load]);
 
   return (
     <div className="p-8 animate-fade-in text-slate-100">

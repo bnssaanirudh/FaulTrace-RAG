@@ -77,7 +77,8 @@ def create_app() -> FastAPI:
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Content-Security-Policy"] = "default-src 'self'"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        if request.url.scheme == "https":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         return response
 
@@ -102,7 +103,7 @@ def create_app() -> FastAPI:
             status_code=500,
             content={
                 "error": "internal_server_error",
-                "message": str(exc),
+                "message": str(exc) if settings.debug else "An internal error occurred",
                 "request_id": getattr(request.state, "request_id", "unknown"),
             },
         )
@@ -128,6 +129,35 @@ def create_app() -> FastAPI:
         system,
         worlds,
     )
+
+    # Starlette resolves the first matching route. Keep literal endpoints such
+    # as /datasets/text and /runs/batch-evaluate-policy ahead of parameterized
+    # routes such as /datasets/{snapshot_id} and /runs/{run_id}.
+    def route_specificity(route) -> tuple[int, int, str]:
+        path = getattr(route, "path", "")
+        return (path.count("{"), -len(path.split("/")), path)
+
+    for module in (
+        health,
+        system,
+        demo,
+        worlds,
+        queries,
+        gold,
+        runs,
+        artifacts,
+        datasets,
+        query_packs,
+        disagreements,
+        providers,
+        policies,
+        experiments,
+        annotations,
+        governance,
+        retrieval,
+        analytics,
+    ):
+        module.router.routes.sort(key=route_specificity)
 
     app.include_router(health.router, prefix="/api/v1", tags=["Health"])
     app.include_router(system.router, prefix="/api/v1", tags=["System"])

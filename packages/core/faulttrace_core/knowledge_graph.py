@@ -259,6 +259,7 @@ class ProvenanceGraphBuilder:
                     edge_type="contains",
                     source_id=dataset_node_id,
                     target_id=node_id,
+                    evidence_span=None,
                 )
             )
 
@@ -291,6 +292,7 @@ class ProvenanceGraphBuilder:
                     edge_type="contains",
                     source_id=doc_node_id,
                     target_id=node_id,
+                    evidence_span=None,
                 )
             )
 
@@ -349,6 +351,7 @@ class ProvenanceGraphBuilder:
                         edge_type="contains",
                         source_id=dataset_node_id,
                         target_id=doc_node_id,
+                        evidence_span=None,
                     )
                 )
 
@@ -370,6 +373,7 @@ class ProvenanceGraphBuilder:
                         edge_type="contains",
                         source_id=doc_node_id,
                         target_id=chunk_node_id,
+                        evidence_span=None,
                     )
                 )
 

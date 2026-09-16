@@ -158,7 +158,8 @@ class TextIngestionPipeline:
         import hashlib
         h = hashlib.sha256()
         with open(chunks_path, "rb") as f:
-            while b := f.read(65536): h.update(b)
+            while b := f.read(65536):
+                h.update(b)
         canonical_hash = h.hexdigest()
 
         # Build Snapshot

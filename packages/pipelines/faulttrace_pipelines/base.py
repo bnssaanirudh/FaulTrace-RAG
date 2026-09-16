@@ -15,6 +15,7 @@ Design decisions:
 from __future__ import annotations
 
 import json
+import random
 import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
@@ -42,6 +43,44 @@ class AbstractPipeline(ABC):
 
     def __init__(self, artifacts_dir: Path = Path("artifacts/runs")):
         self.artifacts_dir = Path(artifacts_dir)
+        self.execution_seed = 0
+
+    def fault_rng(self, query: QuerySpec, namespace: str) -> random.Random:
+        """Return a deterministic, independently namespaced experimental RNG."""
+        material = f"{query.query_id}|{self.execution_seed}|{namespace}"
+        return random.Random(material)
+
+    def replay_extraction(self, query: QuerySpec, scoped_df: pd.DataFrame) -> list[dict[str, Any]]:
+        """Execute this pipeline's extraction component on an explicit scope.
+
+        Deterministic pipelines share the canonical fact extraction component.
+        Pipelines with a learned or intentionally faulty extractor override this
+        boundary so counterfactual retrieval changes propagate downstream.
+        """
+        from faulttrace_gold.pandas_engine import PandasEvaluator
+
+        fact_df = PandasEvaluator().extract_facts(query.fact_spec, scoped_df)
+        return fact_df.to_dict(orient="records")
+
+    def replay_aggregation(self, query: QuerySpec, extracted_rows: list[dict[str, Any]]) -> Any:
+        """Execute this pipeline's aggregation component on explicit extracted facts."""
+        if not extracted_rows:
+            from faulttrace_core.models import CountSpec, SumSpec, TopKSpec, TrendSpec
+
+            if isinstance(query.aggregation_spec, CountSpec | SumSpec):
+                return 0
+            if isinstance(query.aggregation_spec, TopKSpec | TrendSpec):
+                return []
+            return None
+        from faulttrace_core.models import IsNotNullPredicate
+        from faulttrace_gold.pandas_engine import PandasEvaluator
+
+        ext_df = pd.DataFrame(extracted_rows)
+        if "scope_decision" in ext_df.columns:
+            ext_df = ext_df[ext_df["scope_decision"] == "in_scope"]
+        eval_query = query.model_copy(deep=True)
+        eval_query.scope_predicate = IsNotNullPredicate(field="record_id")
+        return PandasEvaluator().evaluate(eval_query, ext_df).get("result")
 
     # ── Public API ──────────────────────────────────────────────────────────
 
@@ -86,19 +125,19 @@ class AbstractPipeline(ABC):
         loss: float | None = None
         gold_answer_value = None
 
-        if gold_answer is not None and answer_value is not None:
+        if gold_answer is not None:
             gold_answer_value = gold_answer.answer_value
             try:
-                from faulttrace_gold.validator import _results_agree
+                from faulttrace_gold.validator import results_agree
 
-                is_correct = _results_agree(
+                is_correct = results_agree(
                     answer_value,
                     gold_answer.answer_value,
                     gold_answer.tolerance,
                 )
                 is_within_tolerance = is_correct
-                if isinstance(answer_value, (int, float)) and isinstance(
-                    gold_answer.answer_value, (int, float)
+                if isinstance(answer_value, int | float) and isinstance(
+                    gold_answer.answer_value, int | float
                 ):
                     loss = abs(float(answer_value) - float(gold_answer.answer_value))
                 else:
@@ -121,6 +160,7 @@ class AbstractPipeline(ABC):
             query_id=str(query.query_id),
             pipeline_id=self.pipeline_id,
             provider_id=self.provider_id,
+            execution_seed=self.execution_seed,
             started_at=started_at,
             completed_at=completed_at,
             status=status,
@@ -146,13 +186,26 @@ class AbstractPipeline(ABC):
         from faulttrace_pipelines.certification import CertificationEngine
         from faulttrace_pipelines.coverage_adapters import extract_coverage_observations
 
-        obs = extract_coverage_observations(pipeline_run, trace_events, df)
-        policy_config = AnswerPolicyConfig(policy_id="strict_exact_v1")
+        obs = extract_coverage_observations(pipeline_run, trace_events, df, query)
+        policy_config = AnswerPolicyConfig(
+            policy_id="strict_structured_semantic_v2",
+            version="2.0",
+            require_provenance_verification=True,
+            min_source_fact_fidelity=1.0,
+            min_numeric_fidelity=None,
+            require_aggregation_replay=True,
+        )
         cert_engine = CertificationEngine(policy=policy_config)
         cert = cert_engine.certify(pipeline_run, query, obs)
 
+        certificate_path = self.artifacts_dir / run_id / "certificate.json"
+        certificate_path.write_text(cert.model_dump_json(indent=2), encoding="utf-8")
+        pipeline_run.artifact_references["certificate"] = str(certificate_path)
+
         pipeline_run.certificate_id = cert.certificate_id
         pipeline_run.certificate_hash = cert.certificate_hash
+        pipeline_run.certificate_policy_id = cert.policy_id
+        pipeline_run.certificate_assurance_scope = cert.assurance_scope
         pipeline_run.policy_decision = cert.decision.value
 
         if cert.decision == CoverageDecision.CERTIFIED:

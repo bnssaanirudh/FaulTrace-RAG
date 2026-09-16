@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useCallback, useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { api, World, Query, Run } from '@/lib/api';
+import { api, World, Query } from '@/lib/api';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Zap, AlertTriangle, ShieldCheck, HelpCircle, RefreshCw, BarChart2, Coins } from 'lucide-react';
-import Link from 'next/link';
+import { Zap, Coins } from 'lucide-react';
 import { formatMs } from '@/lib/utils';
 
 function RunLabContent() {
@@ -24,7 +22,6 @@ function RunLabContent() {
   // Pipeline execution parameters
   const [pipelineId, setPipelineId] = useState('P0-deterministic-scope-baseline');
   const [providerId, setProviderId] = useState('deterministic');
-  const [model, setModel] = useState('gpt-4o-mini');
   const [retriever, setRetriever] = useState('bm25');
   const [topK, setTopK] = useState(10);
   const [batchSize, setBatchSize] = useState(10);
@@ -34,11 +31,10 @@ function RunLabContent() {
   // States
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
-  const [runResult, setRunResult] = useState<Run | null>(null);
   const [error, setError] = useState('');
   const [dryRunEstimate, setDryRunEstimate] = useState<any>(null);
 
-  async function loadInitial() {
+  const loadInitial = useCallback(async () => {
     setLoading(true);
     try {
       const [wList, qList] = await Promise.all([
@@ -64,17 +60,23 @@ function RunLabContent() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [initialQueryId]);
+
+  useEffect(() => {
+    void loadInitial();
+  }, [loadInitial]);
 
   // Load queries matching the selected world
   useEffect(() => {
     if (!selectedWorldId) return;
     api.listQueries(selectedWorldId, undefined, 1, 100).then((res) => {
       setQueries(res.items);
-      if (res.items.length > 0 && !res.items.find(q => q.query_id === selectedQueryId)) {
-        setSelectedQueryId(res.items[0].query_id);
-        setSelectedQuery(res.items[0]);
-      }
+      setSelectedQueryId((currentQueryId) => {
+        if (res.items.some(q => q.query_id === currentQueryId)) return currentQueryId;
+        const firstQuery = res.items[0];
+        setSelectedQuery(firstQuery || null);
+        return firstQuery?.query_id || '';
+      });
     });
   }, [selectedWorldId]);
 
@@ -84,10 +86,11 @@ function RunLabContent() {
     setDryRunEstimate(null);
   }, [selectedQueryId, queries]);
 
-  // Compute dry-run estimate when parameters change
+  // Compute an explicitly simulated planning estimate. These values are not
+  // measured results and are never sent to reporting endpoints.
   useEffect(() => {
     if (!selectedQueryId || !pipelineId) return;
-    // Mock dry run cost estimate based on batch settings and token estimates
+    // Fixed planning assumptions for UI sizing only.
     const isLLM = !pipelineId.includes('deterministic') && !pipelineId.includes('P0');
     if (isLLM) {
       setDryRunEstimate({
@@ -115,12 +118,10 @@ function RunLabContent() {
       return;
     }
     setRunning(true);
-    setRunResult(null);
     setError('');
 
     try {
       const res = await api.createRun(selectedQueryId, pipelineId);
-      setRunResult(res);
       // Automatically redirect to full trace panel after execution
       router.push(`/runs/${res.run_id}/trace`);
     } catch (e: any) {
@@ -334,7 +335,7 @@ function RunLabContent() {
                     <span className="text-slate-300">{formatMs(dryRunEstimate.estimated_latency_ms)}</span>
                   </div>
                   <div className="rounded-lg bg-orange-500/10 p-3 border border-orange-500/20 text-[10px] text-slate-400 italic leading-relaxed">
-                    Note: Tokens and API charges are simulated when selecting Grounded Local simulator to prevent token budget drain.
+                    SIMULATED PLANNING ASSUMPTION — not a measured latency, token count, or charge.
                   </div>
                 </div>
               ) : (

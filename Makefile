@@ -47,6 +47,14 @@ seed:  ## Generate deterministic demo corpus worlds and queries
 	$(PYTHON) -m faulttrace_data.cli generate --scales 10,50,200,1000 --seed 42 --output-dir data/generated/worlds
 	@Write-Host "✓ Corpus worlds generated in data/generated/worlds/" -ForegroundColor Green
 
+.PHONY: migrate
+migrate:  ## Apply database migrations
+	$(PYTHON) -m alembic -c alembic.ini upgrade head
+
+.PHONY: seed-demo
+seed-demo: migrate  ## Idempotently seed worlds, queries, and dual-engine gold
+	$(PYTHON) -m faulttrace_api.bootstrap
+
 ##############################################################################
 # Tests
 ##############################################################################
@@ -76,7 +84,7 @@ test-smoke:  ## Run end-to-end smoke tests
 api:  ## Start the FastAPI backend on port 8000
 	@Write-Host "Starting FastAPI backend on http://localhost:8000 ..." -ForegroundColor Cyan
 	@Write-Host "Docs: http://localhost:8000/docs" -ForegroundColor Yellow
-	$(PYTHON) -m uvicorn faulttrace_api.main:app --host 0.0.0.0 --port 8000 --reload --app-dir apps/api
+	$(PYTHON) -m uvicorn faulttrace_api.main:app --host 127.0.0.1 --port 8000 --reload --app-dir apps/api
 
 .PHONY: web
 web:  ## Start the Next.js frontend on port 3000
@@ -97,22 +105,27 @@ dev:  ## Start API + web concurrently (opens two terminals)
 
 .PHONY: lint
 lint:  ## Run ruff linter
-	$(PYTHON) -m ruff check packages/ apps/api/faulttrace_api/ --fix
+	$(PYTHON) -m ruff check packages/ apps/api/faulttrace_api/ scripts/
+	cd apps\web; npm run lint
 
 .PHONY: typecheck
 typecheck:  ## Run mypy type check
-	$(PYTHON) -m mypy packages/core/faulttrace_core/ packages/gold/faulttrace_gold/ --ignore-missing-imports
+	$(PYTHON) -m mypy packages/core/faulttrace_core/ packages/gold/faulttrace_gold/ --ignore-missing-imports --no-site-packages
+	cd apps\web; npm run type-check
 
 .PHONY: release-check
 release-check: lint typecheck test test-smoke ## Run all quality gates for release
-	@Write-Host "Running frontend quality gates..." -ForegroundColor Cyan
-	cd apps\web; npm run type-check; npm run lint
+	cd apps\web; npm run build
+
+.PHONY: verify-experiments
+verify-experiments:  ## Regenerate every checked-in experiment from a clean immutable seed
+	$(PYTHON) scripts/run_verified_experiments.py
 
 .PHONY: release
 release: release-check ## Package the codebase into a zip artifact
 	@Write-Host "Creating release artifact..." -ForegroundColor Cyan
-	powershell -Command "Compress-Archive -Path * -DestinationPath faulttrace-release.zip -Force"
-	@Write-Host "Release created at faulttrace-release.zip" -ForegroundColor Green
+	$(PYTHON) scripts/build_release.py
+	@Write-Host "Release created under dist/" -ForegroundColor Green
 
 ##############################################################################
 # Cleanup
@@ -144,7 +157,7 @@ help:  ## Show this help
 	@Write-Host ""
 	@Write-Host "  make setup    Create venv, install Python + Node deps" -ForegroundColor White
 	@Write-Host "  make seed     Generate deterministic demo corpus worlds" -ForegroundColor White
-	@Write-Host "  make test     Run full test suite (68 tests)" -ForegroundColor White
+	@Write-Host "  make test     Run the full backend test suite" -ForegroundColor White
 	@Write-Host "  make api      Start FastAPI backend  → http://localhost:8000" -ForegroundColor White
 	@Write-Host "  make web      Start Next.js frontend → http://localhost:3000" -ForegroundColor White
 	@Write-Host "  make dev      Start both in separate terminal windows" -ForegroundColor White

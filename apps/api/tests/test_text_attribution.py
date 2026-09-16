@@ -40,6 +40,29 @@ class TestSupportStatusLoss:
     def test_unknown_status_defaults_to_half(self):
         assert support_status_loss("unknown_status_xyz") == 0.5
 
+    def test_loss_uses_actual_unsupported_gold_label(self):
+        assert support_status_loss("unsupported", "unsupported") == 0.0
+        assert support_status_loss("supported", "unsupported") == 1.0
+
+    def test_loss_uses_actual_insufficient_gold_label(self):
+        assert support_status_loss("insufficient_evidence", "insufficient_evidence") == 0.0
+        assert support_status_loss("supported", "insufficient_evidence") == 0.5
+
+    def test_attributor_does_not_treat_supported_as_correct_for_unsupported_gold(self):
+        result = TextAttributor().attribute(
+            query_id="q_gold",
+            dataset_id="scifact",
+            pipeline_id="text-answer",
+            pipeline_answer=None,
+            pipeline_support_status="supported",
+            gold_support_status="unsupported",
+            oracle_results=dict.fromkeys(
+                ["none", "R", "E", "A", "RE", "RA", "EA", "REA"],
+                "unsupported",
+            ),
+        )
+        assert result.total_error == 1.0
+
 
 # ---------------------------------------------------------------------------
 # TextAttributor — correct answer (baseline loss = 0)

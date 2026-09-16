@@ -59,6 +59,10 @@ class BatchAttributionRunner:
                         "interaction_term": attr_res.interaction_term,
                         "dominant_fault": attr_res.dominant_fault,
                         "dominant_fault_confidence": attr_res.dominant_fault_confidence,
+                        "outcome_active_faults": json.dumps(attr_res.outcome_active_faults),
+                        "artifact_discrepancy_faults": json.dumps(
+                            attr_res.artifact_discrepancy_faults
+                        ),
                         "phi_scope": phi_dict.get("scope", 0.0),
                         "phi_facts": phi_dict.get("facts", 0.0),
                         "phi_aggregation": phi_dict.get("aggregation", 0.0),
@@ -72,14 +76,16 @@ class BatchAttributionRunner:
                         "run_id": parent_run.run_id,
                         "query_id": str(query.query_id),
                         "pipeline_id": parent_run.pipeline_id,
-                        "is_correct": False,
-                        "total_error": 1.0,
-                        "interaction_term": 0.0,
-                        "dominant_fault": "lattice_failure",
-                        "dominant_fault_confidence": 1.0,
-                        "phi_scope": 0.0,
-                        "phi_facts": 0.0,
-                        "phi_aggregation": 0.0,
+                        "is_correct": parent_run.is_correct,
+                        "total_error": None,
+                        "interaction_term": None,
+                        "dominant_fault": "unavailable",
+                        "dominant_fault_confidence": None,
+                        "outcome_active_faults": None,
+                        "artifact_discrepancy_faults": None,
+                        "phi_scope": None,
+                        "phi_facts": None,
+                        "phi_aggregation": None,
                         "error_detail": str(e),
                     }
                 )
@@ -99,7 +105,7 @@ class BatchAttributionRunner:
 
         # Generate Summary
         if not df_results.empty:
-            valid_df = df_results[df_results["dominant_fault"] != "lattice_failure"]
+            valid_df = df_results[df_results["dominant_fault"] != "unavailable"]
             summary = {
                 "batch_id": batch_id,
                 "total_runs": len(results),

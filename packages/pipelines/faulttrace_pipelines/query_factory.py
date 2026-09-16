@@ -1146,6 +1146,9 @@ class QueryFactory:
         seed: int | None = None,
     ) -> list[QuerySpec]:
         """Generate target_count queries for the given world."""
+        if target_count < 1:
+            raise ValueError("target_count must be at least 1")
+
         world_dir = self.data_dir / "worlds" / world_id
         parquet_path = world_dir / "records.parquet"
 
@@ -1169,9 +1172,12 @@ class QueryFactory:
             (QueryFamily.TREND, _TREND_TEMPLATES, self._make_trend_query),
         ]
 
-        per_family = max(target_count // len(families), len(_COUNT_TEMPLATES))
+        base_count, remainder = divmod(target_count, len(families))
 
-        for family, templates, maker in families:
+        for index, (family, templates, maker) in enumerate(families):
+            family_count = base_count + (1 if index < remainder else 0)
+            if family_count == 0:
+                continue
             family_queries = self._generate_family(
                 family=family,
                 templates=templates,
@@ -1179,11 +1185,31 @@ class QueryFactory:
                 world_id=world_id,
                 df=df,
                 rng=rng,
-                count=per_family,
+                count=family_count,
             )
             queries.extend(family_queries)
 
-        return queries
+        # Persist the registry dimensions and deterministic split on the query
+        # itself. Experiment filters must never have to infer these attributes
+        # from a separate, potentially stale registry.
+        enriched: list[QuerySpec] = []
+        for query in queries[:target_count]:
+            registry_entry = TEMPLATE_REGISTRY.get(query.template_id)
+            split_bucket = int(query.spec_hash()[:4], 16) % 10
+            split = "dev" if split_bucket < 8 else "val" if split_bucket < 9 else "test"
+            enriched.append(
+                query.model_copy(
+                    update={
+                        "difficulty": registry_entry.difficulty if registry_entry else None,
+                        "selectivity": registry_entry.selectivity if registry_entry else None,
+                        "split": split,
+                    }
+                )
+            )
+
+        # Each family generator is bounded and may fail to construct a query for
+        # pathological tiny datasets. Never silently return more than requested.
+        return enriched
 
     def build_benchmark_pack(
         self,
@@ -1250,7 +1276,13 @@ class QueryFactory:
                 d = reg_entry.difficulty
                 count_by_difficulty[d] = count_by_difficulty.get(d, 0) + 1
 
-        gold_ready = (disagreed_count == 0) and (len(unique_queries) > 0)
+        gold_ready = (
+            validate_gold
+            and len(unique_queries) > 0
+            and agreed_count == len(unique_queries)
+            and disagreed_count == 0
+            and skipped_count == 0
+        )
 
         pack = BenchmarkPack(
             world_id=world_id,
@@ -1293,7 +1325,7 @@ class QueryFactory:
             for q in queries:
                 try:
                     pd_result = pandas_eval.evaluate(q, df)
-                    dk_result = duckdb_eval.evaluate(q, df)
+                    dk_result = duckdb_eval.evaluate_from_df(q, df)
                     if results_agree(pd_result["result"], dk_result["result"], q.tolerance):
                         agreed += 1
                     else:

@@ -1,31 +1,27 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useCallback, useEffect, useState, use } from 'react';
 import { api } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { FileText, ArrowLeft, Database } from 'lucide-react';
+import { FileText, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TextDatasetPreviewPage(props: { params: Promise<{ id: string }> }) {
   const params = use(props.params);
-  const [snapshot, setSnapshot] = useState<any | null>(null);
   const [chunks, setChunks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const pageSize = 10;
   const [totalChunks, setTotalChunks] = useState(0);
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const snap = await api.getTextDatasetSnapshot(params.id);
-      setSnapshot(snap);
-      
       const preview = await api.getTextDatasetPreview(params.id, page, pageSize);
       setChunks(preview.chunks || []);
       setTotalChunks(preview.total_chunks || 0);
@@ -34,11 +30,11 @@ export default function TextDatasetPreviewPage(props: { params: Promise<{ id: st
     } finally {
       setLoading(false);
     }
-  }
+  }, [page, params.id]);
 
   useEffect(() => {
-    load();
-  }, [page, pageSize]);
+    void load();
+  }, [load]);
 
   return (
     <div className="p-8 animate-fade-in text-slate-100">

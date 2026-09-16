@@ -53,6 +53,20 @@ def test_bm25_retriever_logic():
     assert "doc2" not in top_doc_ids
 
 
+def test_bm25_returns_complete_ranking_when_scores_are_non_positive():
+    retriever = BM25Retriever()
+    units = [
+        RetrievalUnit(unit_id="d1", record_id="d1", text="alpha"),
+        RetrievalUnit(unit_id="d2", record_id="d2", text="beta"),
+    ]
+    retriever.build_index(units)
+
+    results = retriever.search("unseen-token", top_k=2)
+
+    assert len(results) == 2
+    assert {result["unit"].record_id for result in results} == {"d1", "d2"}
+
+
 def test_evaluation_metrics():
     results = {"q1": ["doc1", "doc2", "doc3"], "q2": ["doc3", "doc1", "doc2"]}
 
