@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "zoo": {
+      "command": "uvx",
+      "args": ["zoo-mcp"],
+      "env": {
+        "ZOO_API_TOKEN": "zoo_sk_ESLpfUjoFdJZADYjyqIaslPxYDsnoYmbETadLYQRFJdBuoevouLQMHlhGnGQtVGz"
+      }
+    }
+  }
+}

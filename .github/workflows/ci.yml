@@ -27,15 +27,13 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
-          pip install -e .
+          pip install -e ".[dev,api,llm,retrieval,research]"
 
       - name: Lint (ruff)
         run: ruff check . --select=E,W,F,N,I --ignore=E501
 
       - name: Type check (mypy)
-        run: mypy packages/core packages/gold packages/pipelines --ignore-missing-imports --no-strict-optional
-        continue-on-error: true  # Treat as warning for now; upgrade to error once stubs are complete
+        run: mypy packages/core packages/gold packages/pipelines/faulttrace_pipelines/attribution.py packages/pipelines/faulttrace_pipelines/lattice.py packages/pipelines/faulttrace_pipelines/active_diagnosis packages/pipelines/faulttrace_pipelines/repair --ignore-missing-imports --no-strict-optional
 
       - name: Run tests
         run: |
@@ -60,7 +58,6 @@ jobs:
         env:
           FAULTTRACE_ENV: test
           DATABASE_URL: sqlite:///./test_ci.db
-        continue-on-error: true  # Coverage gate is informational until full test backfill
 
   # ── Frontend ───────────────────────────────────────────────────────────────
   frontend:
@@ -92,7 +89,6 @@ jobs:
 
       - name: Lint (ESLint)
         run: npx eslint . --ext .ts,.tsx --max-warnings=20
-        continue-on-error: true
 
       - name: Build (production bundle validation)
         run: npm run build

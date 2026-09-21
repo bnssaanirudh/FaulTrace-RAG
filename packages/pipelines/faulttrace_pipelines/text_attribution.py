@@ -326,3 +326,37 @@ class TextAttributor:
             return "aggregation"
         else:
             return "none"
+
+
+class MultiHopGraphAttributor:
+    """
+    Multi-hop graph traversal logic for HotpotQA attribution.
+    
+    This analyzes a ProvenanceGraph to determine if the pipeline successfully 
+    bridged multiple documents (hops) to arrive at the final answer.
+    """
+    
+    def __init__(self, max_hops: int = 2):
+        self.max_hops = max_hops
+
+    def verify_multihop_path(
+        self, 
+        graph, 
+        query_id: str, 
+        answer_node_id: str
+    ) -> bool:
+        """
+        Traverse the provenance graph to verify if a valid multi-hop path exists
+        from the query/documents to the final answer.
+        """
+        # Get the subgraph connected to the answer
+        subgraph = graph.subgraph(root_node_id=answer_node_id, max_hops=self.max_hops)
+        
+        # In a HotpotQA context, a valid multi-hop path requires at least two 
+        # distinct document nodes connecting to the final extraction/answer.
+        doc_nodes = subgraph.nodes_of_type("document")
+        
+        if len(doc_nodes) >= 2:
+            return True
+        return False
+

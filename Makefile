@@ -8,6 +8,7 @@
 #   make web       — start Next.js frontend (port 3000)
 #   make dev       — start both API and web in parallel
 #   make clean     — remove generated data and artifacts
+#   make paper     — rebuild all manuscript evidence tables
 ##############################################################################
 
 SHELL := powershell.exe
@@ -28,8 +29,7 @@ setup:  ## Create virtualenv and install all dependencies
 	@Write-Host "Creating virtual environment..." -ForegroundColor Cyan
 	python -m venv .venv
 	$(PYTHON) -m pip install --upgrade pip --quiet
-	$(PIP) install -r requirements.txt -r requirements-dev.txt --quiet
-	$(PIP) install -e packages/core -e packages/data -e packages/gold -e packages/pipelines -e packages/reporting -e apps/api --quiet
+	$(PIP) install -e ".[dev,api,llm,retrieval,research]" --quiet
 	@Write-Host "✓ Python environment ready" -ForegroundColor Green
 	@Write-Host "Installing Node.js dependencies..." -ForegroundColor Cyan
 	cd apps\web; npm install --legacy-peer-deps --silent

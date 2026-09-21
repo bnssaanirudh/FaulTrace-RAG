@@ -1,0 +1,17 @@
+# .agrules
+# Project Rules and Context
+
+## Tech Stack
+- Language: Python (Backend/Pipelines), TypeScript/TSX (Frontend)
+- Frameworks: React, Next.js (Web), potentially FastAPI or similar for API
+- Tooling: Antigravity Customizations
+
+## Project Goals
+- Build and maintain the FaultTrace RAG (Retrieval-Augmented Generation) system.
+- Ensure high-quality data retrieval, indexing, and pipeline execution.
+
+## Constraints
+- Avoid breaking existing tests in `apps/api/tests/` and `patch_tests.py`.
+- Maintain clean separation between packages (`core`, `data`, `pipelines`, `reporting`) and apps (`api`, `web`).
+- Always use type hints in Python.
+- Use functional components in React/TSX.

@@ -1,6 +1,6 @@
 # Counterfactual Attribution Interpretation
 
-This document provides researchers with boundaries and assumptions for interpreting the output of the Counterfactual Attribution Engine (Prompt 5).
+This document provides researchers with boundaries and assumptions for interpreting the output of the Counterfactual Attribution Engine.
 
 ## The Decomposition Model
 We decompose RAG fault attribution into three components using exact Shapley values derived from oracle replacement:

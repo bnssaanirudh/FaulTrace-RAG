@@ -125,6 +125,28 @@ def evaluate_retrieval(
     for k in k_values:
         metrics[f"recall@{k}"] = recall_at_k(results, qrels, k)
         metrics[f"precision@{k}"] = precision_at_k(results, qrels, k)
-        metrics[f"ndcg@{k}"] = ndcg_at_k(results, qrels, k)
-
     return metrics
+
+# ---------------------------------------------------------------------------
+# N-Stage Causal Pipeline Extensions (Phase C)
+# ---------------------------------------------------------------------------
+
+from abc import ABC, abstractmethod
+
+
+class StageOracle(ABC):
+    """Abstract base class for replacing a specific pipeline stage with oracle data."""
+    
+    @abstractmethod
+    def evaluate(self, *args, **kwargs) -> Any:
+        """Evaluate the oracle for this stage."""
+        pass
+
+
+class StageReplayBoundary(ABC):
+    """Abstract base class for executing a pipeline component on counterfactual data."""
+    
+    @abstractmethod
+    def replay(self, *args, **kwargs) -> Any:
+        """Execute the real pipeline logic for this stage given its inputs."""
+        pass

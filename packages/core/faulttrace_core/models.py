@@ -882,6 +882,7 @@ class CoverageCertificate(BaseModel):
         "structural_coverage"
     )
 
+
     artifact_lineage: dict[str, str] = Field(default_factory=dict)
     certificate_hash: str = ""
 
@@ -902,3 +903,92 @@ class CoverageCertificate(BaseModel):
             }
             object.__setattr__(self, "certificate_hash", _stable_hash(data))
         return self
+
+
+# ---------------------------------------------------------------------------
+# N-Stage Causal Pipeline Extensions (Phase C)
+# ---------------------------------------------------------------------------
+
+
+class PipelineStage(BaseModel):
+    """Identifies a single replaceable component in a generalized causal pipeline."""
+    stage_id: str
+    description: str | None = None
+
+
+class PipelineGraph(BaseModel):
+    """Validates a Directed Acyclic Graph (DAG) of pipeline stages."""
+    stages: dict[str, PipelineStage]
+    edges: list[tuple[str, str]] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_dag(self) -> PipelineGraph:
+        """Ensure edges reference valid stages and no cycles exist."""
+        # Check edge validity
+        for src, dst in self.edges:
+            if src not in self.stages:
+                raise ValueError(f"Edge source '{src}' is not a defined stage.")
+            if dst not in self.stages:
+                raise ValueError(f"Edge destination '{dst}' is not a defined stage.")
+        
+        # Check for cycles using DFS
+        visited = set()
+        path = set()
+        
+        adj = {sid: [] for sid in self.stages}
+        for src, dst in self.edges:
+            adj[src].append(dst)
+            
+        def has_cycle(node: str) -> bool:
+            if node in path:
+                return True
+            if node in visited:
+                return False
+            path.add(node)
+            for neighbor in adj[node]:
+                if has_cycle(neighbor):
+                    return True
+            path.remove(node)
+            visited.add(node)
+            return False
+            
+        for stage_id in self.stages:
+            if has_cycle(stage_id):
+                raise ValueError("Pipeline graph contains a cycle. Must be a DAG.")
+                
+        return self
+
+    def topological_sort(self) -> list[str]:
+        adj = {sid: [] for sid in self.stages}
+        in_degree = {sid: 0 for sid in self.stages}
+        for src, dst in self.edges:
+            adj[src].append(dst)
+            in_degree[dst] += 1
+            
+        queue = [sid for sid, deg in in_degree.items() if deg == 0]
+        sorted_nodes = []
+        
+        while queue:
+            node = queue.pop(0)
+            sorted_nodes.append(node)
+            for neighbor in adj[node]:
+                in_degree[neighbor] -= 1
+                if in_degree[neighbor] == 0:
+                    queue.append(neighbor)
+                    
+        return sorted_nodes
+
+
+class InterventionSet(BaseModel):
+    """A subset of stages chosen for oracle replacement."""
+    replaced_stages: set[str] = Field(default_factory=set)
+
+
+class CounterfactualWorld(BaseModel):
+    """Represents a specific counterfactual execution of a DAG pipeline."""
+    world_id: str = Field(default_factory=lambda: str(uuid4()))
+    intervention: InterventionSet
+    status: RunStatus = RunStatus.PENDING
+    answer_value: Any | None = None
+    loss_diagnostic: Any | None = None  # Typed as Any to avoid circular import loops
+    natural_language_summary: str | None = None

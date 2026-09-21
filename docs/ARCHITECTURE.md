@@ -1,182 +1,70 @@
 # Architecture: FaultTrace-RAG
 
-## Overview
+## 1. System Purpose
+FaultTrace-RAG is a principled counterfactual diagnosis and repair framework for multi-stage analytical Retrieval-Augmented Generation (RAG) pipelines. It replaces unprincipled manual prompt-engineering by algorithmically isolating the exact pipeline component (Retrieval, Extraction, Aggregation) responsible for a downstream hallucination or failure. Using exact Shapley values and descendant replay, the framework allows operators to quantify blame, repair localized faults within bounded budgets (BACD/MCR), and certify system-level outcomes.
 
-FaultTrace-RAG is a research system for counterfactual fault localization in LLM analytics pipelines. It benchmarks six pipeline configurations (P0-P5), executes deterministic oracle replacements, and computes recoverable-error attribution across three error sources: Retrieval (R), Extraction (E), and Aggregation (A).
+## 2. Logical Layers
+The system is cleanly decoupled into the following logical strata:
+- **Data**: Handlers for synthetic metadata and external domain corpora (e.g., SciFact, RAGTruth, COVID-QA).
+- **Query Specification**: AST-like representation of analytical requirements.
+- **Gold Engine**: Deterministic query runners that execute against pristine datasets to generate ground-truth `GoldAnswer` objects.
+- **Pipeline Runtime**: The orchestrator that executes the `Pipeline` interface and manages step-by-step state and lineage.
+- **Retrieval**: Modules for direct context, BM25, and dense embedding retrieval.
+- **Extraction**: Extractors bridging unstructured text to structured facts via constrained generation.
+- **Aggregation/Generation**: Synthesizers that reduce extraction sets into final answers.
+- **Counterfactual Engine**: Oracle-replacement operators that inject ground truth at targeted stages to measure downstream answer loss recovery.
+- **Active Diagnosis**: The Bayesian/Greedy policies that optimally select counterfactual probes to minimize uncertainty.
+- **Repair**: The Cost-Aware and Minimum Counterfactual Repair engines that determine the cheapest set of component updates to flip a bad answer.
+- **Certification**: The `CoverageCertificate` layer that performs strict source-and-program consistency checks.
+- **Reporting**: Parsers and bootstrapping scripts (Python/R) that render experiment artifacts into tables and plots.
+- **API**: A FastAPI service exposing endpoints for real-time trace, diagnosis, and repair workflows.
+- **Frontend**: A Next.js application providing interactive trace trees, counterfactual heatmaps, and annotation queues.
+- **Artifact Storage**: Persistent, immutable trace records utilizing SQLite (relational) and Parquet (analytical sweeps).
 
----
+## 3. Current Pipeline Graph
+The framework treats RAG as a directed acyclic graph of functional components:
+- **Core 3-Stage**: `R → E → A` (Retrieval → Extraction → Aggregation)
+- **Generalized \(C_1 \dots C_n\)**: The runtime supports arbitrary depth via a list of `PipelineStage` objects.
+- **Experimental 5-Stage**: `S → R → E → A → G` (Scope → Retrieval → Extraction → Aggregation → Generation), enabling deep sub-component targeting (e.g., distinguishing semantic generation `G` from factual aggregation `A`).
 
-## Component Diagram
+## 4. Counterfactual Execution
+The core diagnostic mechanism is **descendant replay**. To evaluate the fault at stage $i$, the engine dynamically injects the oracle output $O_i^*$ at stage $i$, and re-executes all downstream components $j > i$. Caching ensures components $k < i$ are not redundantly re-run. This isolation isolates the exact downstream consequence of upstream faults, eliminating observational confounding.
 
-```mermaid
-graph TB
-    subgraph "Data Layer"
-        GEN[Track M Generator<br/>faulttrace_data]
-        CORP[(Corpus Worlds<br/>Parquet/JSONL)]
-        META[(App Metadata<br/>SQLite)]
-        ART[(Artifacts<br/>Parquet/JSON)]
-    end
+## 5. Artifact Lineage
+All pipeline executions are completely reproducible.
+- **Run Artifacts**: Outputs, inputs, logs, and token usage for each component are recorded.
+- **Hashes**: Configuration and trace states are secured via cryptographic SHA-256 hashes.
+- **Manifests**: Large sweeps output deterministic Parquet files, tracked via `MANIFEST_SHA256.json`.
+- **Immutable Bundles**: Once an experiment completes, its artifact directory is sealed; analysis scripts compute properties strictly offline.
 
-    subgraph "Core Contracts"
-        CORE[faulttrace_core<br/>Domain Models]
-        PRED[Safe Predicate AST<br/>ScopePredicate]
-        SPEC[QuerySpec / GoldAnswer<br/>PipelineRun / TraceEvent]
-    end
+## 6. Certification
+Certificates in FaultTrace-RAG are strict structural constraints, not universal truth guarantees.
+- **Certified**: The final answer is perfectly grounded in the provided evidence scope, and the aggregation conforms to the source format without hallucinations.
+- **Uncertified**: The framework detected lexical/numeric drift, hallucinated entities, or an unknown semantic envelope.
+- **What is NOT certified**: Real-world scientific truth, dataset-level fairness, or open-ended generative quality. Negative statistical risk sweeps confirm that these are empirical operating points bounded by the experimental environment.
 
-    subgraph "Gold Engine"
-        PD[Pandas Evaluator<br/>faulttrace_gold]
-        DK[DuckDB Evaluator<br/>faulttrace_gold]
-        VAL[Agreement Validator]
-    end
+## 7. Experiment Architecture
+To support the manuscript and external validation, experiments are partitioned:
+- **Controlled Synthetic**: Track-M experiments utilizing the internal generator for perfect exact-match evaluations.
+- **External Retrieval**: SciFact, HotpotQA, and COVID-QA pipelines leveraging external datasets.
+- **Deterministic Mechanics**: Tests isolating infrastructure integrity without relying on non-deterministic LLMs.
+- **PAPER_MODE**: The strict canonical configuration used to produce the 488,250-case benchmark result tables.
+- **Live-LLM**: 200 audited natural-failure cases testing BACD/MCR against live Qwen/Mistral inferences.
+- **RAGTruth**: Statistical sweeps explicitly searching for risk-controlled false-certification bounds.
 
-    subgraph "Query Factory"
-        QF[Procedural Query Factory<br/>faulttrace_pipelines]
-        TMPL[Query Templates<br/>6 families]
-    end
+## 8. Service Architecture
+The full-stack application relies on:
+- **FastAPI** (Python 3.12) as the backend orchestrator.
+- **Next.js** (React) as the dashboard and attribution visualization frontend.
+- **SQLite / Parquet**: SQLite for rapid trace queries via the UI; Parquet for large-scale R DataFrame consumption.
 
-    subgraph "Pipelines (Prompt 1)"
-        P0[P0: Deterministic Scope Baseline<br/>No LLM]
-    end
+## 9. Security Boundary
+The application is **Local-only by default**. It runs without auth mechanisms, intending to be a developer tool on a secure researcher workstation. The system has access to execute untrusted text streams via LLM prompts. Running the frontend or API bound to public interfaces without a reverse proxy or auth barrier is strictly discouraged.
 
-    subgraph "Pipelines (Future: Prompts 2-4)"
-        P1[P1: Direct Context]
-        P2[P2: BM25 Retrieval]
-        P3[P3: Dense Retrieval]
-        P4[P4: Oracle Scope]
-        P5[P5: Full Oracle]
-    end
-
-    subgraph "API Layer"
-        API[FastAPI Service<br/>faulttrace_api]
-        REPO[SQLAlchemy Repositories]
-        MIGS[Alembic Migrations]
-    end
-
-    subgraph "Frontend"
-        WEB[Next.js App Router<br/>TypeScript]
-        DASH[Research Dashboard]
-        TQ[TanStack Query]
-    end
-
-    GEN --> CORP
-    GEN --> META
-    CORE --> PRED
-    CORE --> SPEC
-    QF --> TMPL
-    QF --> CORE
-    CORP --> P0
-    P0 --> PD
-    P0 --> DK
-    PD --> VAL
-    DK --> VAL
-    VAL --> SPEC
-    P0 --> ART
-    SPEC --> REPO
-    REPO --> META
-    API --> REPO
-    API --> P0
-    API --> QF
-    WEB --> TQ
-    TQ --> API
-    WEB --> DASH
-```
-
----
-
-## Data Flow
-
-### Seeding Flow
-```
-faulttrace data seed --seed 42 --scales 10,50,200,1000
-  -> TrackMGenerator(seed=42)
-     -> World(N=10)  -> Parquet + JSONL + manifest
-     -> World(N=50)  -> Parquet + JSONL + manifest (superset of N=10)
-     -> World(N=200) -> Parquet + JSONL + manifest (superset of N=50)
-     -> World(N=1000)-> Parquet + JSONL + manifest (superset of N=200)
-  -> Register worlds in SQLite metadata DB
-```
-
-### Query Generation Flow
-```
-faulttrace query generate --world-id <id>
-  -> QueryFactory.generate(world, families=[...], count=60)
-     -> For each template x parameterization:
-        -> Instantiate QuerySpec with ScopePredicate + AggregationSpec
-        -> Validate: non-empty scope, valid predicate, supported aggregation
-        -> Compute GoldAnswer via PandasEvaluator + DuckDBEvaluator
-        -> Assert agreement; persist query + gold
-```
-
-### Pipeline Run Flow
-```
-POST /api/v1/runs {query_id, pipeline_id}
-  -> PipelineRunner.execute(query_spec, corpus_world)
-     -> Stage 1: Load query     -> TraceEvent(stage=query_load)
-     -> Stage 2: Scope          -> TraceEvent(stage=scope_enumerate)
-     -> Stage 3: Extract        -> TraceEvent(stage=fact_extract)
-     -> Stage 4: Aggregate      -> TraceEvent(stage=aggregate)
-     -> Stage 5: Validate       -> TraceEvent(stage=validate)
-     -> Stage 6: Persist        -> TraceEvent(stage=persist)
-  -> PipelineRun saved to SQLite
-  -> Artifacts saved to artifacts/runs/<run_id>/
-```
-
----
-
-## Storage Layout
-
-```
-data/
-  generated/
-    worlds/
-      world_<id>/
-        records.parquet          # columnar record storage
-        records.jsonl            # streaming format
-        manifest.json            # generator metadata + hashes
-  fixtures/
-    adversarial_*.jsonl          # controlled edge cases
-
-artifacts/
-  runs/
-    <run_id>/
-      config.json                # immutable run configuration hash
-      trace.jsonl                # all TraceEvents
-      scope_output.parquet       # records in scope
-      extraction.parquet         # extracted fact rows
-      aggregation_result.json    # aggregation plan + result
-      gold_answer.json           # gold comparison
-
-  queries/
-    queries_<world_id>.jsonl     # generated query library
-
-  smoke/
-    smoke_report_<timestamp>.json
-
-<app_data>/
-  faulttrace.db                  # SQLite: worlds, queries, runs, traces
-  alembic.ini                    # migration config
-```
-
----
-
-## Trust Boundaries
-
-1. **Predicate Safety**: `ScopePredicate` is a closed AST. `eval()` is never called on user or corpus text.
-2. **Query Validation**: All QuerySpecs are validated before gold computation.
-3. **Artifact Hashing**: Every artifact references a content hash; hashes are stored immutably with runs.
-4. **No External Calls**: Default execution requires no network access, no GPU, no paid APIs.
-5. **No Public Exposure**: CORS is configured from environment; no auto-deploy.
-
----
-
-## Extension Points
-
-| Extension | Mechanism |
-|-----------|-----------|
-| New pipeline (P1-P5) | Implement `AbstractPipeline` in `faulttrace_pipelines` |
-| New LLM provider | Implement `ModelProvider` interface; register in provider registry |
-| New aggregation type | Add to `AggregationSpec.kind` enum; implement in both gold engines |
-| New corpus dataset | Implement `AbstractGenerator`; register manifest schema |
-| New query family | Add `QueryTemplate` subclass; register in `QueryFactory` |
-| PostgreSQL persistence | Set `DATABASE_URL` to postgres:// in `.env`; run migrations |
-| Dense retrieval | Add retrieval stage to pipeline; implement `RetrieverInterface` |
+## 10. Extension Points
+The architecture is designed to be highly extensible via subclassing:
+- **New Stage**: Inherit from `PipelineStage` and implement `execute()`.
+- **New Retriever**: Subclass `BaseRetriever` and implement `retrieve(query)`.
+- **New Oracle**: Subclass `GoldEngine` and implement a deterministic evaluator for your data schema.
+- **New Provider**: Subclass `ModelProvider` to support new external LLM endpoints (e.g., Azure, Bedrock, vLLM).
+- **New Dataset**: Place raw JSONL/CSV files in `data/raw/` and implement a data loader script mirroring `load_scifact()`.

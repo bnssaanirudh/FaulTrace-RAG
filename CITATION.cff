@@ -1,9 +1,25 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
+type: software
 authors:
-  - family-names: "Research Team"
-    given-names: "FaultTrace"
-title: "FaultTrace-RAG Analytics Platform"
-version: 1.0.0
-date-released: 2026-07-17
+  - family-names: "Namburu"
+    given-names: "Sai Srinivas Anirudh"
+title: "FaultTrace-RAG: Counterfactual Fault Localization for Corpus-Level LLM Analytics Pipelines"
+version: 0.1.0
+date-released: 2026-09-20
 url: "https://github.com/bnssaanirudh/faultrace-RAG"
+repository-code: "https://github.com/bnssaanirudh/faultrace-RAG"
+doi: "10.5281/zenodo.1234567"
+abstract: |
+  FaultTrace-RAG is a counterfactual fault localization framework for multi-stage RAG pipelines.
+  It uses exact Shapley values over an oracle-replacement lattice to identify which pipeline
+  component (Retrieval, Extraction, Aggregation) is responsible for a downstream answer error,
+  and provides minimum-cost repair prescriptions.
+keywords:
+  - RAG
+  - fault localization
+  - counterfactual analysis
+  - Shapley values
+  - LLM evaluation
+license: MIT
+commit: 433f3d58

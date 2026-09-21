@@ -71,11 +71,17 @@ def all_subgroups(records: list[dict[str, Any]], mode: str) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("verified_directory", type=Path)
+    parser.add_argument("--allow-fast-mode", action="store_true", help="Allow processing FAST_MODE exploratory artifacts")
     args = parser.parse_args()
     root = args.verified_directory.resolve()
     results_path = root / "verified_results.json"
     attribution_path = root / "attribution_audit" / "attributions.json"
     results = json.loads(results_path.read_text(encoding="utf-8"))
+    
+    if not args.allow_fast_mode:
+        if results.get("configuration", {}).get("FAST_MODE", False):
+            raise ValueError("Refusing analysis: Source artifact was generated in FAST_MODE. Use --allow-fast-mode to override.")
+            
     attributions = json.loads(attribution_path.read_text(encoding="utf-8"))
     if results.get("failed_run_count") != 0 or results["attribution_audit"].get(
         "failed_lattice_count"

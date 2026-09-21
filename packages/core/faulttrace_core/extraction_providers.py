@@ -305,7 +305,14 @@ class SchemaConstrainedLLMExtractor(ExtractionProvider):
             response = self._client.chat.completions.create(
                 model=self.model,
                 temperature=self.temperature,
-                response_format={"type": "json_object"},
+                response_format={
+                    "type": "json_schema",
+                    "json_schema": {
+                        "name": "extraction_result",
+                        "schema": self._get_output_schema(),
+                        "strict": True,
+                    },
+                },
                 messages=[
                     {
                         "role": "system",
@@ -356,7 +363,7 @@ Return a JSON object with these fields:
                 "abstention_reason": {"type": ["string", "null"]},
                 "answer_text": {"type": ["string", "null"]},
             },
-            "required": ["support_status"],
+            "required": ["support_status", "supporting_quote", "abstention_reason", "answer_text"],
             "additionalProperties": False,
         }
 

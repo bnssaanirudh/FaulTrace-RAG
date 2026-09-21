@@ -29,8 +29,9 @@ engineering validation, not a production or general language-model evaluation.
 - Zero observed false certification is not a mathematical zero-risk guarantee. The result
   is conditional on the implemented injections, queries, and dataset, and v2 sharply lowers
   coverage under fact and aggregation faults.
-- Counterfactual attribution explains recoverable error under the specified R/E/A oracle
-  interventions. It is not causal identification of model internals.
+- Counterfactual attribution explains recoverable error under the specified oracle
+  interventions (e.g., R/E/A). It is not causal identification of model internals.
+- Exact Shapley value computation has exponential time complexity $O(2^N)$ with respect to the number of pipeline stages $N$. While the underlying execution engine generalizes to arbitrary Directed Acyclic Graphs (DAGs), it practically caps $N \\le 12$, making exact calculation unsuitable for highly granular micro-service attribution without relying on approximation methods.
 - The audit uses 20 deterministically selected runs per P0–P5 pipeline. Stage-matched
   artifact diagnosis obtains 0.817 single-fault exact-set accuracy and 0.901 macro-F1, but
   requires offline oracle access and still makes substantial errors.

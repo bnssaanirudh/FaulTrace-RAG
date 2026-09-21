@@ -1,0 +1,77 @@
+{
+  "experiment_registry_version": "1.0",
+  "canonical_commit": "433f3d58",
+  "note": "This is the single machine-readable authority for manuscript evidence eligibility. All paper tables must trace to records where manuscript_eligibility is true.",
+  "experiments": [
+    {
+      "experiment_id": "EXP-001",
+      "title": "PAPER_MODE Cross-Domain Controlled Fault Injection",
+      "status": "final",
+      "source_commit": "433f3d58",
+      "datasets": ["Track-M Synthetic", "SciFact", "HotpotQA Distractor", "COVID-QA"],
+      "model_revisions": ["gpt-4o-2024-08-06", "deterministic-oracle"],
+      "mode": "PAPER_MODE",
+      "manuscript_eligibility": true,
+      "path": "04_final_results/master_results/",
+      "total_cases": 488250,
+      "superseded_by": null,
+      "reason": "Canonical large-scale controlled injection sweep. All headline accuracy numbers derive from this experiment."
+    },
+    {
+      "experiment_id": "EXP-002",
+      "title": "Live LLM Natural Failure Validation (Qwen/Mistral)",
+      "status": "final",
+      "source_commit": "433f3d58",
+      "datasets": ["RAGTruth subset", "HotpotQA subset"],
+      "model_revisions": ["Qwen-2.5-72B", "Mistral-Large-2"],
+      "mode": "LIVE_LLM",
+      "manuscript_eligibility": true,
+      "path": "05_live_llm_evidence/validated_evidence/",
+      "total_cases": 200,
+      "superseded_by": null,
+      "reason": "200 manually audited natural LLM failures used to validate BACD/MCR on real model outputs."
+    },
+    {
+      "experiment_id": "EXP-003",
+      "title": "RAGTruth Statistical Risk-Control Sweep",
+      "status": "final",
+      "source_commit": "433f3d58",
+      "datasets": ["RAGTruth"],
+      "model_revisions": ["deterministic-certifier"],
+      "mode": "PAPER_MODE",
+      "manuscript_eligibility": true,
+      "path": "04_final_results/",
+      "total_cases": null,
+      "superseded_by": null,
+      "reason": "Negative result: max certified coverage = 0.0% under all alpha/delta configurations tested. Reported as an honest negative finding."
+    },
+    {
+      "experiment_id": "EXP-EXCLUDED-PHI4",
+      "title": "Phi-4 Corrected Rerun (Preliminary)",
+      "status": "excluded",
+      "source_commit": "433f3d58",
+      "datasets": ["Track-M Synthetic"],
+      "model_revisions": ["Phi-4"],
+      "mode": "FAST_MODE",
+      "manuscript_eligibility": false,
+      "path": "01_notebooks/FaulTrace_Phi4_Corrected_Rerun.ipynb",
+      "total_cases": null,
+      "superseded_by": "EXP-001",
+      "reason": "Excluded: generation-termination mismatch detected during audit. Phi-4 results are not used in any manuscript table."
+    },
+    {
+      "experiment_id": "EXP-EXPLORATORY-001",
+      "title": "FAST_MODE Debug Runs",
+      "status": "archived",
+      "source_commit": "433f3d58",
+      "datasets": ["Track-M Synthetic"],
+      "model_revisions": ["various"],
+      "mode": "FAST_MODE",
+      "manuscript_eligibility": false,
+      "path": "03_raw_result_archives/fast_mode/",
+      "total_cases": null,
+      "superseded_by": "EXP-001",
+      "reason": "Exploratory/debugging outputs with reduced sample sizes. Not valid for any manuscript headline claim."
+    }
+  ]
+}

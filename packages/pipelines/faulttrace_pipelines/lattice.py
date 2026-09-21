@@ -55,15 +55,50 @@ class OracleLatticeRunner:
         corpus_df: pd.DataFrame,
     ) -> LatticeDiagnosticSummary:
         """Execute the 8 subsets and return the full Shapley diagnostic."""
-        subsets = ["none", "R", "E", "A", "RE", "RA", "EA", "REA"]
-        subset_runs = {}
-
-        for subset in subsets:
-            replace_R = "R" in subset
-            replace_E = "E" in subset
-            replace_A = "A" in subset
-
-            # Execute intervention
+        from faulttrace_core.models import PipelineGraph, PipelineStage, RunStatus
+        from faulttrace_core.models import CounterfactualWorld, InterventionSet
+        from faulttrace_pipelines.n_stage_lattice import GeneralLatticeRunner
+        
+        # 1. Define the R/E/A graph
+        graph = PipelineGraph(
+            stages={
+                "R": PipelineStage(stage_id="R", description="Scope/Retrieval"),
+                "E": PipelineStage(stage_id="E", description="Fact Extraction"),
+                "A": PipelineStage(stage_id="A", description="Aggregation"),
+            },
+            edges=[("R", "E"), ("E", "A")]
+        )
+        
+        # 2. Get baseline loss by running the "none" intervention
+        baseline_run = self._execute_intervention(
+            parent_run=parent_run,
+            query=query,
+            gold_answer=gold_answer,
+            corpus_df=corpus_df,
+            replace_R=False,
+            replace_E=False,
+            replace_A=False,
+            subset_name="none"
+        )
+        
+        if baseline_run.status != "valid":
+             raise ValueError(f"Baseline intervention failed: {baseline_run.natural_language_summary}")
+             
+        baseline_loss = baseline_run.loss_diagnostic.normalized_loss
+        
+        # 3. Define mapping to legacy _execute_intervention
+        legacy_runs = {}
+        
+        def evaluate_world_fn(intervened_stages: set[str]) -> CounterfactualWorld:
+            replace_R = "R" in intervened_stages
+            replace_E = "E" in intervened_stages
+            replace_A = "A" in intervened_stages
+            subset_name = ""
+            if replace_R: subset_name += "R"
+            if replace_E: subset_name += "E"
+            if replace_A: subset_name += "A"
+            if not subset_name: subset_name = "none"
+            
             lattice_run = self._execute_intervention(
                 parent_run=parent_run,
                 query=query,
@@ -72,77 +107,37 @@ class OracleLatticeRunner:
                 replace_R=replace_R,
                 replace_E=replace_E,
                 replace_A=replace_A,
-                subset_name=subset,
+                subset_name=subset_name
             )
-            subset_runs[subset] = lattice_run
-
-        invalid = [name for name, run in subset_runs.items() if run.status != "valid"]
-        if invalid:
-            reasons = {
-                name: subset_runs[name].natural_language_summary for name in invalid
-            }
-            raise ValueError(
-                "Counterfactual attribution requires a complete valid lattice; "
-                f"invalid subsets={reasons}"
+            legacy_runs[subset_name] = lattice_run
+            
+            cw = CounterfactualWorld(
+                intervention=InterventionSet(replaced_stages=intervened_stages),
+                status=RunStatus.COMPLETED if lattice_run.status == "valid" else RunStatus.FAILED,
+                answer_value=lattice_run.answer_value,
+                loss_diagnostic=lattice_run.loss_diagnostic,
+                natural_language_summary=lattice_run.natural_language_summary
             )
+            return cw
 
-        # Compute exact Shapley
-        baseline_loss = subset_runs["none"].loss_diagnostic.normalized_loss
-
-        def v(subset_name: str) -> float:
-            """
-            Value function: reduction in loss when replacing subset 'subset_name' with oracle.
-
-            Formula: v(S) = baseline_loss - loss(S)
-
-            IMPORTANT: v(S) CAN be negative. This happens when an oracle replacement
-            makes the answer WORSE (e.g. replacing a lucky-correct component with oracle
-            reveals that oracle scope changes the aggregation domain in a harmful way).
-            Negative values represent harmful oracle components and are preserved — not clamped.
-            """
-            loss = subset_runs[subset_name].loss_diagnostic.normalized_loss
-            # Not clamped: can be negative if oracle replacement makes things worse
-            return baseline_loss - loss
-
-        # phi_i = sum_{S not containing i} weight(|S|) * (v(S ∪ {i}) - v(S))
-        # For 3 components R, E, A:
-        # weight(|S|=0) = 1/3, weight(|S|=1) = 1/6 per subset, weight(|S|=2) = 1/3
-        def shapley(i: str, with_i: list[str], without_i: list[str]) -> float:
-            total = 0.0
-
-            # |S|=0: weight = 1/3
-            total += (1 / 3) * (v(with_i[0]) - v("none"))
-
-            # |S|=1: weight = 1/6 each (2 subsets of size 1 not containing i)
-            total += (1 / 6) * (v(with_i[1]) - v(without_i[1]))
-            total += (1 / 6) * (v(with_i[2]) - v(without_i[2]))
-
-            # |S|=2: weight = 1/3
-            total += (1 / 3) * (v("REA") - v(without_i[3]))
-
-            # NOT clamped to 0: negative Shapley values are valid and informative
-            return total
-
-        phi_R = shapley("R", ["R", "RE", "RA", "REA"], ["none", "E", "A", "EA"])
-        phi_E = shapley("E", ["E", "RE", "EA", "REA"], ["none", "R", "A", "RA"])
-        phi_A = shapley("A", ["A", "RA", "EA", "REA"], ["none", "R", "E", "RE"])
-
-        # Exact Shapley efficiency leaves no separate residual interaction term.
-        # Keep the field for schema compatibility and expose only numerical drift.
-        recoverable = v("REA")
-        attributed = phi_R + phi_E + phi_A
-        interaction = recoverable - attributed
-        if abs(interaction) < 1e-12:
-            interaction = 0.0
+        # 4. Delegate to general engine
+        general_runner = GeneralLatticeRunner(self.artifacts_dir)
+        general_summary = general_runner.execute_lattice(
+            parent_run=parent_run,
+            graph=graph,
+            stage_definitions={}, # not used by legacy adapter mapping
+            baseline_loss=baseline_loss,
+            evaluate_world_fn=evaluate_world_fn
+        )
 
         return LatticeDiagnosticSummary(
             parent_run_id=parent_run.run_id,
-            baseline_loss=baseline_loss,
-            subset_runs=subset_runs,
-            phi_R=phi_R,
-            phi_E=phi_E,
-            phi_A=phi_A,
-            interaction=interaction,
+            baseline_loss=general_summary.baseline_loss,
+            subset_runs=legacy_runs,
+            phi_R=general_summary.shapley_values.get("R", 0.0),
+            phi_E=general_summary.shapley_values.get("E", 0.0),
+            phi_A=general_summary.shapley_values.get("A", 0.0),
+            interaction=general_summary.interaction,
         )
 
     def _execute_intervention(

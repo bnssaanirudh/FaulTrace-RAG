@@ -1,0 +1,22 @@
+experiment:
+  id: "EXP-004-baselines"
+  name: "Baseline Comparison (FaultTrace vs RAGAS vs RAGChecker)"
+  dataset_dir: "05_live_llm_evidence/validated_evidence/"
+  output_dir: "04_final_results/baseline_comparison/"
+  num_cases: 200
+
+baselines:
+  - name: "RAGChecker"
+    enabled: true
+    adapter: "ragchecker"
+    threshold: 0.5
+    model: "gpt-4o-mini"
+  - name: "RAGAS"
+    enabled: true
+    adapter: "ragas"
+    threshold: 0.5
+    model: "gpt-4o-mini"
+  - name: "FaultTrace"
+    enabled: true
+    adapter: "faulttrace"
+    threshold: 0.5

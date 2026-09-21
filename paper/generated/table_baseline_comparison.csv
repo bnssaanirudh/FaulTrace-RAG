@@ -1,0 +1,2 @@
+Method,ExactSetAcc,MacroF1,MicroF1,CI_lo,CI_hi
+"RAGChecker(threshold=0.5, model=gpt-4o-mini)",0.000,0.334,0.420,0.000,0.000

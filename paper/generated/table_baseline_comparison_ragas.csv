@@ -1,0 +1,2 @@
+Method,ExactSetAcc,MacroF1,MicroF1,CI_lo,CI_hi
+"RAGAS(threshold=0.5, llm=gpt-4o-mini)",0.280,0.306,0.393,0.160,0.400

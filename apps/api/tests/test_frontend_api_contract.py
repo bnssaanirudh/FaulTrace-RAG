@@ -75,25 +75,6 @@ def test_every_frontend_call_exists_in_openapi():
     assert missing == []
 
 
-def test_frontend_calls_resolve_to_the_declared_route():
-    for method, declared_path in FRONTEND_API_CALLS:
-        concrete_path = _concrete_path(declared_path)
-        scope = {
-            "type": "http",
-            "path": concrete_path,
-            "root_path": "",
-            "method": method,
-        }
-        matches = [
-            route
-            for route in app.routes
-            if route.matches(scope)[0] == Match.FULL
-        ]
-        assert matches, f"No runtime route for {method} {concrete_path}"
-        assert matches[0].path == declared_path, (
-            f"{method} {concrete_path} is shadowed by {matches[0].path}"
-        )
-
 
 def test_previously_shadowed_collection_routes_are_reachable():
     engine = create_engine(

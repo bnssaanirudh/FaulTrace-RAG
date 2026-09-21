@@ -137,15 +137,18 @@ def get_engine(db_url: str | None = None):
     """Get or create the SQLAlchemy engine."""
     global _engine
     if db_url:
-        engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        connect_args = {"check_same_thread": False} if db_url.startswith("sqlite") else {}
+        engine = create_engine(db_url, connect_args=connect_args)
         return engine
     if _engine is None:
         settings = get_settings()
-        settings.db_path.parent.mkdir(parents=True, exist_ok=True)
-        _engine = create_engine(
-            settings.effective_database_url,
-            connect_args={"check_same_thread": False},
-        )
+        db_url_to_use = settings.effective_database_url
+        if db_url_to_use.startswith("sqlite"):
+            settings.db_path.parent.mkdir(parents=True, exist_ok=True)
+            connect_args = {"check_same_thread": False}
+        else:
+            connect_args = {}
+        _engine = create_engine(db_url_to_use, connect_args=connect_args)
     return _engine
 
 
@@ -167,5 +170,31 @@ def get_db():
 
 
 def init_db():
-    """Ensure a fresh local database is usable; deployments still run Alembic first."""
-    Base.metadata.create_all(get_engine())
+    """Ensure a fresh local database is usable via Alembic migrations.
+    
+    This replaces Base.metadata.create_all() to ensure database schema
+    safety and proper tracking of migrations.
+    """
+    from alembic.config import Config
+    from alembic import command
+    import os
+    
+    settings = get_settings()
+    
+    # Get the project root directory where alembic.ini is located
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    project_root = os.path.dirname(os.path.dirname(os.path.dirname(current_dir)))
+    alembic_ini_path = os.path.join(project_root, "alembic.ini")
+    
+    # Configure alembic
+    alembic_cfg = Config(alembic_ini_path)
+    
+    # We must provide the correct database URL to Alembic dynamically
+    # so that tests using an in-memory or alternative db path work.
+    alembic_cfg.attributes["configure_logger"] = False
+    
+    # Override the sqlalchemy.url for Alembic using the current effective DB URL
+    # or ensure Alembic env.py uses get_settings().effective_database_url (which it does).
+    
+    # Run the upgrade
+    command.upgrade(alembic_cfg, "head")

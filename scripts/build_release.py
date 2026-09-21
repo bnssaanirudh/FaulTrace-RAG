@@ -48,9 +48,8 @@ ALLOWED_ROOT_FILES = {
     "openapi.json",
     "pyproject.toml",
     "README.md",
-    "requirements-dev.txt",
-    "requirements.lock.txt",
-    "requirements.txt",
+    "REPRODUCIBILITY.md",
+    "RELEASE_NOTES.md",
     "USER_GUIDE.md",
 }
 

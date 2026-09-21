@@ -19,7 +19,9 @@ checked-in configuration, and verified every bundle checksum.
 - Attribution-metrics SHA-256: `ebad459aaaffe1bec01be20b7532d705cb66b9eccc48ba3dded1d99f491eb811`
 - Secondary-analysis SHA-256: `0a960985b7382e4bbff6d45cac5854fd11397b7f55d139261558dabce0e78f99`
 - Executable tracked-diff SHA-256: `46debdf51d6751ba18c5dca8c4cdb42999258d44187fcec0fbcfe3a75071f787`
-- Git HEAD: `433f3d580e0fe526113e94af89398d137ffc84a0`
+- Canonical Evaluated Commit: `433f3d580e0fe526113e94af89398d137ffc84a0`
+
+> Experimental results were generated against commit `433f3d580e0fe526113e94af89398d137ffc84a0`. Later repository commits may contain documentation, archival packaging, or presentation updates and must not be described as having generated those measurements unless experiments are rerun.
 
 ## Pipeline accuracy and certification
 
@@ -41,7 +43,8 @@ certification, never by either policy.
 
 The v2 policy eliminated observed false certification in this controlled run, but it
 did so conservatively. On P2 and P3, answer coverage fell from 90.8% to 15.0% and from
-95.8% to 14.2%, respectively. These are empirical operating points, not guarantees.
+95.8% to 14.2%, respectively. These are empirical operating points, not mathematical guarantees.
+A later stricter statistical risk-controlled sweep (e.g., on RAGTruth) found no nonzero-coverage setting satisfying the requested held-out constraints (i.e., maximum held-out certified coverage = 0).
 
 ## Attribution audit
 
@@ -68,6 +71,26 @@ component artifact with an oracle evaluated on the same stage input. It is an of
 oracle diagnostic, not an online certificate. Attempted injections that leave the artifact
 unchanged remain counted as false negatives against injection-intent labels; therefore the
 0.550 and 0.350 compound results are useful but not a complete solution.
+
+## Large-scale PAPER_MODE counterfactual validation
+
+This section reports the authoritative cross-domain diagnostic performance measured across 488,250 pipeline failure cases. Identifiable cases are explicitly defined as those pipeline failures where intervention using the full set of oracles produced a measurable recovery in loss (`baseline_loss > 1e-10`). 
+
+- Total PAPER_MODE cases evaluated: 488,250
+- Identifiable cases: 343,197 (70.29%)
+- MCR exact recovery: 0.7581 (mean residual ~1.76e-05)
+
+**Fault-Set Diagnostic Performance:**
+
+| Attribution Method | Exact Fault-Set F1 | Exact Set Recovery |
+|---|---:|---:|
+| Exact Shapley Value | 0.9280 | - |
+| Singleton-delta | 0.8935 | - |
+| Random Baseline | 0.5906 | - |
+| Active-Benchmark Shapley | 0.9401 | - |
+| Minimal Causal Repair (MCR) | - | 0.7581 |
+
+These exact measurements are documented in the immutable validation audit: `06_audits_and_manifests/RESULT_RECOMPUTATION_AUDIT.json`.
 
 ## Interpretation boundary
 
@@ -140,6 +163,8 @@ fixed on 246 test rows, it achieved precision 0.9067, recall 0.3285, coverage 0.
 false-certification 0.0933. The all-covered structural baseline had false-certification
 0.1585. This is a narrow source-consistency policy, not semantic entailment or truth
 certification.
+
+Additionally, a statistical risk-controlled sweep was conducted on the RAGTruth dataset. Across sixteen tested settings targeting a strict false-certification bound, the maximum held-out certified coverage was exactly zero. This confirms that the strict mathematical constraint could not be met at any useful coverage level, emphasizing that these mechanisms act as engineering constraints rather than absolute mathematical guarantees of zero risk.
 
 - Mechanics summary SHA-256: `f30a87572b0caf1ddbf93145c895f458c8ab341749751cbd95a212a74002e75b`
 - Per-case Parquet SHA-256: `2e55f64974f7f7d63f6619fec70a0e74751a8dd3b46079ca702946c826a79f21`

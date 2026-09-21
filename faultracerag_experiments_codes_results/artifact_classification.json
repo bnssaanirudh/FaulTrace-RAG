@@ -1,0 +1,26 @@
+[
+    {
+        "path": "03_raw_result_archives/fast_mode/",
+        "experiment_mode": "fast_mode",
+        "manuscript_eligibility": false,
+        "source_commit": "433f3d58",
+        "reason": "Exploratory and debugging outputs. Reduced samples/seeds.",
+        "superseded_by": "04_final_results/"
+    },
+    {
+        "path": "04_final_results/",
+        "experiment_mode": "paper_mode",
+        "manuscript_eligibility": true,
+        "source_commit": "433f3d58",
+        "reason": "Canonical results matching the final manuscript.",
+        "superseded_by": null
+    },
+    {
+        "path": "01_notebooks/FaulTrace_Phi4_Corrected_Rerun.ipynb",
+        "experiment_mode": "preliminary",
+        "manuscript_eligibility": false,
+        "source_commit": "433f3d58",
+        "reason": "Phi-4 results were excluded due to generation-termination mismatch during audit.",
+        "superseded_by": null
+    }
+]
